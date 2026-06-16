@@ -72,12 +72,9 @@
                         <label>Department</label>
                         <select name="department" required>
                             <option value="">Select department</option>
-                            <option value="Admin">Admin</option>
-                            <option value="HR">HR</option>
-                            <option value="Marketing">Marketing</option>
-                            <option value="Production">Production</option>
-                            <option value="Sales">Sales</option>
-                            <option value="Accounting">Accounting</option>
+                            @foreach(($departments ?? []) as $dept)
+                                <option value="{{ $dept->name }}" {{ old('department') === $dept->name ? 'selected' : '' }}>{{ $dept->name }}</option>
+                            @endforeach
                         </select>
                     </div>
 

@@ -32,68 +32,60 @@
     <section class="dashboard-grid">
         <a href="/employees" class="dashboard-card">
             <div class="card-icon">👥</div>
-            <h3>Employees</h3>
-            <p>View and manage employee records.</p>
+            <h3>{{ $stats['totalEmployees'] ?? 0 }}</h3>
+            <p>Total employees · {{ $stats['activeEmployees'] ?? 0 }} active</p>
         </a>
 
         <a href="/attendance" class="dashboard-card">
             <div class="card-icon">🕒</div>
-            <h3>Attendance</h3>
-            <p>Track daily time records and attendance logs.</p>
+            <h3>{{ $stats['presentToday'] ?? 0 }}</h3>
+            <p>Present today · {{ $stats['lateToday'] ?? 0 }} late</p>
         </a>
 
         <a href="/leave" class="dashboard-card">
             <div class="card-icon">📄</div>
-            <h3>Leave Requests</h3>
-            <p>Review, approve, and manage employee leaves.</p>
+            <h3>{{ $stats['pendingLeaves'] ?? 0 }}</h3>
+            <p>Pending leave requests</p>
         </a>
 
         <a href="/payroll" class="dashboard-card">
             <div class="card-icon">💰</div>
-            <h3>Payroll</h3>
-            <p>Manage salary records and payroll reports.</p>
+            <h3>₱{{ number_format($stats['totalNetPay'] ?? 0, 2) }}</h3>
+            <p>Total net pay disbursed</p>
         </a>
     </section>
 
     <section class="dashboard-panel">
         <div class="panel-card">
-            <h2>HRIS Overview</h2>
+            <h2>Pending Leave Requests</h2>
 
-            <div class="stats">
-                <div>
-                    <strong>HR</strong>
-                    <span>Employee Records</span>
-                </div>
-
-                <div>
-                    <strong>DTR</strong>
-                    <span>Attendance Logs</span>
-                </div>
-
-                <div>
-                    <strong>PAY</strong>
-                    <span>Payroll System</span>
-                </div>
-            </div>
+            @forelse($pendingLeaveList ?? [] as $leave)
+                <a href="/leave/{{ $leave->id }}" class="list-row">
+                    <div>
+                        <strong>{{ $leave->employee_name }}</strong>
+                        <span>{{ $leave->leave_type }} · {{ $leave->total_days }} day(s)</span>
+                    </div>
+                    <span class="pill">{{ date('M d', strtotime($leave->start_date)) }}</span>
+                </a>
+            @empty
+                <p class="muted">No pending leave requests. 🎉</p>
+            @endforelse
         </div>
 
         <div class="panel-card">
-            <h2>System Status</h2>
+            <h2>Recent Employees</h2>
 
-            <ul class="status-list">
-                <li>
-                    <span></span>
-                    Employee database is active
-                </li>
-                <li>
-                    <span></span>
-                    Attendance monitoring is ready
-                </li>
-                <li>
-                    <span></span>
-                    Payroll module is available
-                </li>
-            </ul>
+            @forelse($recentEmployees ?? [] as $employee)
+                <a href="/employees/{{ $employee->id }}" class="list-row">
+                    <div>
+                        <strong>{{ $employee->name }}</strong>
+                        <span>{{ $employee->position }} · {{ $employee->department }}</span>
+                    </div>
+                    <span class="pill">{{ $employee->employee_id }}</span>
+                </a>
+            @empty
+                <p class="muted">No employees yet.</p>
+            @endforelse
         </div>
     </section>
 </main>
@@ -244,6 +236,46 @@
         margin: 0 0 24px;
         font-size: 24px;
         color: #111827;
+    }
+
+    .list-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        padding: 14px 0;
+        border-bottom: 1px solid #f3f4f6;
+        text-decoration: none;
+        color: #111827;
+    }
+
+    .list-row:last-child { border-bottom: none; }
+
+    .list-row strong {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 4px;
+    }
+
+    .list-row span {
+        font-size: 13px;
+        color: #6b7280;
+        font-weight: 500;
+    }
+
+    .pill {
+        background: #f3f4f6;
+        color: #374151;
+        padding: 6px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .muted {
+        color: #6b7280;
+        font-size: 14px;
     }
 
     .stats {

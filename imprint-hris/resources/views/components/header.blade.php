@@ -16,12 +16,29 @@
 
     <a href="/employees" class="{{ request()->is('employees*') ? 'active' : '' }}">Employees</a>
 
+    <a href="/departments" class="{{ request()->is('departments*') ? 'active' : '' }}">Departments</a>
+
     <a href="/attendance" class="{{ request()->is('attendance*') ? 'active' : '' }}">Attendance</a>
 
     <a href="/leave" class="{{ request()->is('leave*') ? 'active' : '' }}">Leave</a>
 
     <a href="/payroll" class="{{ request()->is('payroll*') ? 'active' : '' }}">Payroll</a>
+
+    <a href="/reports" class="{{ request()->is('reports*') ? 'active' : '' }}">Reports</a>
 </nav>
+
+        @auth
+        <div class="user-box">
+            <div class="user-meta">
+                <span class="user-name">{{ auth()->user()->name }}</span>
+                <span class="user-role">{{ auth()->user()->role }}</span>
+            </div>
+            <form action="/logout" method="POST" style="margin:0;">
+                @csrf
+                <button type="submit" class="logout-btn">Logout</button>
+            </form>
+        </div>
+        @endauth
     </div>
 </header>
 
@@ -148,6 +165,51 @@
         background: white;
         color: #111827;
         box-shadow: 0 8px 20px rgba(17, 24, 39, 0.08);
+    }
+
+    .user-box {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-shrink: 0;
+    }
+
+    .user-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        line-height: 1.2;
+    }
+
+    .user-name {
+        font-size: 14px;
+        font-weight: 800;
+        color: #111827;
+    }
+
+    .user-role {
+        font-size: 11px;
+        font-weight: 700;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+
+    .logout-btn {
+        border: 1px solid #e5e7eb;
+        background: #f3f4f6;
+        color: #111827;
+        padding: 10px 14px;
+        border-radius: 12px;
+        font-size: 13px;
+        font-weight: 800;
+        cursor: pointer;
+        font-family: inherit;
+    }
+
+    .logout-btn:hover {
+        background: #111827;
+        color: white;
     }
 
     @media (max-width: 900px) {

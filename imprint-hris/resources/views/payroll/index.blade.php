@@ -122,19 +122,24 @@
 
                             <td>
                                 <div class="actions">
-                                    @if($payroll->status === 'Pending')
-                                        <form action="/payroll/{{ $payroll->id }}/paid" method="POST">
+                                    <a href="/payroll/{{ $payroll->id }}" class="view-btn">View</a>
+                                    <a href="/payroll/{{ $payroll->id }}/payslip" class="view-btn" target="_blank">Payslip</a>
+
+                                    @if(in_array(auth()->user()->role, ['Admin', 'HR']))
+                                        @if($payroll->status === 'Pending')
+                                            <form action="/payroll/{{ $payroll->id }}/paid" method="POST">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="paid-btn">Mark Paid</button>
+                                            </form>
+                                        @endif
+
+                                        <form action="/payroll/{{ $payroll->id }}" method="POST" onsubmit="return confirm('Delete this payroll record?')">
                                             @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="paid-btn">Mark Paid</button>
+                                            @method('DELETE')
+                                            <button type="submit" class="delete-btn">Delete</button>
                                         </form>
                                     @endif
-
-                                    <form action="/payroll/{{ $payroll->id }}" method="POST" onsubmit="return confirm('Delete this payroll record?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="delete-btn">Delete</button>
-                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -417,6 +422,16 @@
         cursor: pointer;
         font-family: inherit;
         white-space: nowrap;
+    }
+
+    .view-btn {
+        text-decoration: none;
+        background: #111827;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
     }
 
     .paid-btn {

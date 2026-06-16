@@ -76,6 +76,9 @@
                         <th>Time Out</th>
                         <th>Status</th>
                         <th>Remarks</th>
+                        @if(in_array(auth()->user()->role, ['Admin', 'HR']))
+                            <th>Action</th>
+                        @endif
                     </tr>
                 </thead>
 
@@ -121,10 +124,23 @@
                             </td>
 
                             <td>{{ $attendance->remarks ?? '—' }}</td>
+
+                            @if(in_array(auth()->user()->role, ['Admin', 'HR']))
+                                <td>
+                                    <div class="actions">
+                                        <a href="/attendance/{{ $attendance->id }}/edit">Edit</a>
+                                        <form action="/attendance/{{ $attendance->id }}" method="POST" onsubmit="return confirm('Delete this attendance record?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="delete-btn">Delete</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            @endif
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8">
+                            <td colspan="9">
                                 <div class="empty-state">
                                     <div class="empty-icon">🕒</div>
                                     <h3>No attendance records yet</h3>
@@ -464,6 +480,23 @@
             text-align: center;
         }
     }
+
+    .actions { display: flex; gap: 8px; align-items: center; }
+    .actions a, .actions button {
+        text-decoration: none;
+        color: #111827;
+        background: #f3f4f6;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .actions a:hover { background: #111827; color: white; }
+    .actions form { margin: 0; }
+    .delete-btn:hover { background: #991b1b; color: white; }
 </style>
 
 </body>

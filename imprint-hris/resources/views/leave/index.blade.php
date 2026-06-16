@@ -120,25 +120,29 @@
 
                             <td>
                                 <div class="actions">
-                                    @if($leave->status === 'Pending')
-                                        <form action="/leave/{{ $leave->id }}/approve" method="POST">
-                                            @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="approve-btn">Approve</button>
-                                        </form>
+                                    <a href="/leave/{{ $leave->id }}" class="view-btn">View</a>
 
-                                        <form action="/leave/{{ $leave->id }}/reject" method="POST">
+                                    @if(in_array(auth()->user()->role, ['Admin', 'HR']))
+                                        @if($leave->status === 'Pending')
+                                            <form action="/leave/{{ $leave->id }}/approve" method="POST">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="approve-btn">Approve</button>
+                                            </form>
+
+                                            <form action="/leave/{{ $leave->id }}/reject" method="POST">
+                                                @csrf
+                                                @method('PATCH')
+                                                <button type="submit" class="reject-btn">Reject</button>
+                                            </form>
+                                        @endif
+
+                                        <form action="/leave/{{ $leave->id }}" method="POST" onsubmit="return confirm('Delete this leave request?')">
                                             @csrf
-                                            @method('PATCH')
-                                            <button type="submit" class="reject-btn">Reject</button>
+                                            @method('DELETE')
+                                            <button type="submit" class="delete-btn">Delete</button>
                                         </form>
                                     @endif
-
-                                    <form action="/leave/{{ $leave->id }}" method="POST" onsubmit="return confirm('Delete this leave request?')">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="delete-btn">Delete</button>
-                                    </form>
                                 </div>
                             </td>
                         </tr>
@@ -423,6 +427,16 @@
         font-weight: 800;
         cursor: pointer;
         font-family: inherit;
+    }
+
+    .view-btn {
+        text-decoration: none;
+        background: #111827;
+        color: white;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
     }
 
     .approve-btn {
