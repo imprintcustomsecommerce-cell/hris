@@ -1,58 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Payroll Record | Imprint HRIS</title>
-</head>
+@extends('layouts.app')
 
-<body>
+@section('title', 'Payroll Record | Imprint HRIS')
+@section('heading', 'Payroll Record')
 
-<x-header />
+@section('content')
+    @php $sc = $payroll->status === 'Paid' ? 'green' : 'amber'; @endphp
 
-<main class="page">
-    @if(session('success'))
-        <div class="success-alert">{{ session('success') }}</div>
-    @endif
-
-    @php $statusClass = $payroll->status === 'Paid' ? 'green' : 'amber'; @endphp
-
-    <section class="page-header">
+    <div class="page-head">
         <div>
-            <span class="badge">Payroll</span>
             <h1>{{ $payroll->payroll_month }} {{ $payroll->payroll_year }}</h1>
             <p>{{ $payroll->employee_name }} · {{ $payroll->department }}</p>
         </div>
-        <div style="display:flex; gap:10px;">
-            <a href="/payroll/{{ $payroll->id }}/payslip" class="add-btn" target="_blank">View Payslip</a>
-            <a href="/payroll" class="back-btn">← Back</a>
+        <div class="head-actions">
+            <a href="/payroll/{{ $payroll->id }}/payslip" class="btn btn-primary" target="_blank">View Payslip</a>
+            <a href="/payroll" class="btn btn-ghost">← Back</a>
         </div>
-    </section>
+    </div>
 
-    <section class="detail-grid">
-        <div class="detail-card">
-            <h2>Employee</h2>
-            <div class="detail-row"><span>Name</span><strong>{{ $payroll->employee_name }}</strong></div>
-            <div class="detail-row"><span>Employee ID</span><strong>{{ $payroll->employee_code }}</strong></div>
-            <div class="detail-row"><span>Department</span><strong>{{ $payroll->department }}</strong></div>
-            <div class="detail-row"><span>Position</span><strong>{{ $payroll->position }}</strong></div>
-            <div class="detail-row"><span>Status</span><strong><span class="status {{ $statusClass }}">{{ $payroll->status }}</span></strong></div>
-            <div class="detail-row"><span>Payment Date</span><strong>{{ $payroll->payment_date ? date('M d, Y', strtotime($payroll->payment_date)) : '—' }}</strong></div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-head"><h2>Employee</h2></div>
+            <div class="card-body">
+                <div class="info-row"><span class="k">Name</span><span class="v">{{ $payroll->employee_name }}</span></div>
+                <div class="info-row"><span class="k">Employee ID</span><span class="v">{{ $payroll->employee_code }}</span></div>
+                <div class="info-row"><span class="k">Department</span><span class="v">{{ $payroll->department }}</span></div>
+                <div class="info-row"><span class="k">Position</span><span class="v">{{ $payroll->position }}</span></div>
+                <div class="info-row"><span class="k">Status</span><span class="v"><span class="badge {{ $sc }}">{{ $payroll->status }}</span></span></div>
+                <div class="info-row"><span class="k">Payment Date</span><span class="v">{{ $payroll->payment_date ? date('M d, Y', strtotime($payroll->payment_date)) : '—' }}</span></div>
+            </div>
         </div>
 
-        <div class="detail-card">
-            <h2>Earnings & Deductions</h2>
-            <div class="detail-row"><span>Basic Salary</span><strong>₱{{ number_format($payroll->basic_salary, 2) }}</strong></div>
-            <div class="detail-row"><span>Allowances</span><strong>₱{{ number_format($payroll->allowances, 2) }}</strong></div>
-            <div class="detail-row"><span>Overtime Pay</span><strong>₱{{ number_format($payroll->overtime_pay, 2) }}</strong></div>
-            <div class="detail-row"><span>Gross Pay</span><strong>₱{{ number_format($payroll->gross_pay, 2) }}</strong></div>
-            <div class="detail-row"><span>Deductions</span><strong>− ₱{{ number_format($payroll->deductions, 2) }}</strong></div>
-            <div class="detail-row"><span>Net Pay</span><strong style="font-size:18px;">₱{{ number_format($payroll->net_pay, 2) }}</strong></div>
+        <div class="card">
+            <div class="card-head"><h2>Earnings & Deductions</h2></div>
+            <div class="card-body">
+                <div class="info-row"><span class="k">Basic Salary</span><span class="v">₱{{ number_format($payroll->basic_salary, 2) }}</span></div>
+                <div class="info-row"><span class="k">Allowances</span><span class="v">₱{{ number_format($payroll->allowances, 2) }}</span></div>
+                <div class="info-row"><span class="k">Overtime Pay</span><span class="v">₱{{ number_format($payroll->overtime_pay, 2) }}</span></div>
+                <div class="info-row"><span class="k">Gross Pay</span><span class="v">₱{{ number_format($payroll->gross_pay, 2) }}</span></div>
+                <div class="info-row"><span class="k">Deductions</span><span class="v">− ₱{{ number_format($payroll->deductions, 2) }}</span></div>
+                <div class="info-row"><span class="k">Net Pay</span><span class="v" style="font-size:18px; color:var(--accent);">₱{{ number_format($payroll->net_pay, 2) }}</span></div>
+            </div>
         </div>
-    </section>
-</main>
-
-@include('components.page-style')
-
-</body>
-</html>
+    </div>
+@endsection

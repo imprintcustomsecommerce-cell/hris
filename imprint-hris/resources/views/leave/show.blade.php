@@ -1,72 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leave Request | Imprint HRIS</title>
-</head>
+@extends('layouts.app')
 
-<body>
+@section('title', 'Leave Request | Imprint HRIS')
+@section('heading', 'Leave Request')
 
-<x-header />
+@section('content')
+    @php $sc = ['Pending'=>'amber','Approved'=>'green','Rejected'=>'red'][$leave->status] ?? 'gray'; @endphp
 
-<main class="page">
-    @if(session('success'))
-        <div class="success-alert">{{ session('success') }}</div>
-    @endif
-
-    @php
-        $statusClass = ['Pending' => 'amber', 'Approved' => 'green', 'Rejected' => 'red'][$leave->status] ?? 'gray';
-    @endphp
-
-    <section class="page-header">
+    <div class="page-head">
         <div>
-            <span class="badge">Leave Request</span>
             <h1>{{ $leave->leave_type }}</h1>
             <p>{{ $leave->employee_name }} · {{ $leave->department }}</p>
         </div>
-        <a href="/leave" class="back-btn">← Back to Leave</a>
-    </section>
+        <div class="head-actions"><a href="/leave" class="btn btn-ghost">← Back</a></div>
+    </div>
 
-    <section class="detail-grid">
-        <div class="detail-card">
-            <h2>Request Details</h2>
-            <div class="detail-row"><span>Employee</span><strong>{{ $leave->employee_name }}</strong></div>
-            <div class="detail-row"><span>Employee ID</span><strong>{{ $leave->employee_code }}</strong></div>
-            <div class="detail-row"><span>Department</span><strong>{{ $leave->department }}</strong></div>
-            <div class="detail-row"><span>Leave Type</span><strong>{{ $leave->leave_type }}</strong></div>
-            <div class="detail-row"><span>Status</span><strong><span class="status {{ $statusClass }}">{{ $leave->status }}</span></strong></div>
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-head"><h2>Request Details</h2></div>
+            <div class="card-body">
+                <div class="info-row"><span class="k">Employee</span><span class="v">{{ $leave->employee_name }}</span></div>
+                <div class="info-row"><span class="k">Employee ID</span><span class="v">{{ $leave->employee_code }}</span></div>
+                <div class="info-row"><span class="k">Department</span><span class="v">{{ $leave->department }}</span></div>
+                <div class="info-row"><span class="k">Leave Type</span><span class="v">{{ $leave->leave_type }}</span></div>
+                <div class="info-row"><span class="k">Status</span><span class="v"><span class="badge {{ $sc }}">{{ $leave->status }}</span></span></div>
+            </div>
         </div>
 
-        <div class="detail-card">
-            <h2>Duration</h2>
-            <div class="detail-row"><span>Start Date</span><strong>{{ date('M d, Y', strtotime($leave->start_date)) }}</strong></div>
-            <div class="detail-row"><span>End Date</span><strong>{{ date('M d, Y', strtotime($leave->end_date)) }}</strong></div>
-            <div class="detail-row"><span>Total Days</span><strong>{{ $leave->total_days }}</strong></div>
-            <div class="detail-row"><span>Remarks</span><strong>{{ $leave->remarks ?? '—' }}</strong></div>
+        <div class="card">
+            <div class="card-head"><h2>Duration</h2></div>
+            <div class="card-body">
+                <div class="info-row"><span class="k">Start Date</span><span class="v">{{ date('M d, Y', strtotime($leave->start_date)) }}</span></div>
+                <div class="info-row"><span class="k">End Date</span><span class="v">{{ date('M d, Y', strtotime($leave->end_date)) }}</span></div>
+                <div class="info-row"><span class="k">Total Days</span><span class="v">{{ $leave->total_days }}</span></div>
+                <div class="info-row"><span class="k">Remarks</span><span class="v">{{ $leave->remarks ?? '—' }}</span></div>
+            </div>
         </div>
+    </div>
 
-        <div class="detail-card full">
-            <h2>Reason</h2>
-            <p style="margin:0; color:#374151; line-height:1.7;">{{ $leave->reason ?? 'No reason provided.' }}</p>
+    <div class="card" style="margin-top:18px;">
+        <div class="card-head"><h2>Reason</h2></div>
+        <div class="card-body" style="padding-bottom:24px;">
+            <p style="margin:8px 0 0; color:#334155; line-height:1.7;">{{ $leave->reason ?? 'No reason provided.' }}</p>
 
             @if(in_array(auth()->user()->role, ['Admin', 'HR']) && $leave->status === 'Pending')
-                <div class="form-actions" style="justify-content:flex-start;">
-                    <form action="/leave/{{ $leave->id }}/approve" method="POST">
-                        @csrf @method('PATCH')
-                        <button type="submit" class="save-btn">Approve</button>
-                    </form>
-                    <form action="/leave/{{ $leave->id }}/reject" method="POST">
-                        @csrf @method('PATCH')
-                        <button type="submit" class="cancel-btn">Reject</button>
-                    </form>
+                <div class="actions" style="margin-top:22px;">
+                    <form action="/leave/{{ $leave->id }}/approve" method="POST">@csrf @method('PATCH')<button type="submit" class="btn btn-success">Approve Request</button></form>
+                    <form action="/leave/{{ $leave->id }}/reject" method="POST">@csrf @method('PATCH')<button type="submit" class="btn btn-danger">Reject Request</button></form>
                 </div>
             @endif
         </div>
-    </section>
-</main>
-
-@include('components.page-style')
-
-</body>
-</html>
+    </div>
+@endsection

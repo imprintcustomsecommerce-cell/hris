@@ -1,82 +1,58 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Departments | Imprint HRIS</title>
-</head>
+@extends('layouts.app')
 
-<body>
+@section('title', 'Departments | Imprint HRIS')
+@section('heading', 'Departments')
 
-<x-header />
-
-<main class="page">
-    @if(session('success'))
-        <div class="success-alert">{{ session('success') }}</div>
-    @endif
-
-    <section class="page-header">
+@section('content')
+    <div class="page-head">
         <div>
-            <span class="badge">Organization</span>
             <h1>Departments</h1>
-            <p>Manage your company's departments and team structure.</p>
+            <p>Organize your company's teams and structure.</p>
         </div>
-
         @if(in_array(auth()->user()->role, ['Admin', 'HR']))
-            <a href="/departments/create" class="add-btn">+ Add Department</a>
+            <div class="head-actions">
+                <a href="/departments/create" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                    Add Department
+                </a>
+            </div>
         @endif
-    </section>
+    </div>
 
-    <section class="panel">
+    <div class="card">
+        <div class="card-head"><h2>All Departments</h2></div>
         <div class="table-wrap">
             <table>
-                <thead>
-                    <tr>
-                        <th>Department</th>
-                        <th>Description</th>
-                        <th>Employees</th>
-                        @if(in_array(auth()->user()->role, ['Admin', 'HR']))
-                            <th>Action</th>
-                        @endif
-                    </tr>
-                </thead>
+                <thead><tr><th>Department</th><th>Description</th><th>Employees</th>@if(in_array(auth()->user()->role, ['Admin', 'HR']))<th></th>@endif</tr></thead>
                 <tbody>
                     @forelse($departments ?? [] as $dept)
                         <tr>
-                            <td><strong>{{ $dept->name }}</strong></td>
+                            <td><strong style="color:var(--text);">{{ $dept->name }}</strong></td>
                             <td>{{ $dept->description ?? '—' }}</td>
-                            <td><span class="pill">{{ $dept->employee_count }}</span></td>
+                            <td><span class="badge blue">{{ $dept->employee_count }}</span></td>
                             @if(in_array(auth()->user()->role, ['Admin', 'HR']))
                                 <td>
                                     <div class="actions">
-                                        <a href="/departments/{{ $dept->id }}/edit">Edit</a>
+                                        <a href="/departments/{{ $dept->id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
                                         <form action="/departments/{{ $dept->id }}" method="POST" onsubmit="return confirm('Delete this department?');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="del">Delete</button>
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                                         </form>
                                     </div>
                                 </td>
                             @endif
                         </tr>
                     @empty
-                        <tr>
-                            <td colspan="4">
-                                <div class="empty-state">
-                                    <div class="empty-icon">🏢</div>
-                                    <h3>No departments yet</h3>
-                                    <p>Add your first department to organize employees.</p>
-                                </div>
-                            </td>
-                        </tr>
+                        <tr><td colspan="4">
+                            <div class="empty">
+                                <div class="empty-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14"/></svg></div>
+                                <h3>No departments yet</h3>
+                                <p>Add your first department.</p>
+                            </div>
+                        </td></tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-    </section>
-</main>
-
-@include('components.page-style')
-
-</body>
-</html>
+    </div>
+@endsection

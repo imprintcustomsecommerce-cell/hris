@@ -1,71 +1,66 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports | Imprint HRIS</title>
-</head>
+@extends('layouts.app')
 
-<body>
+@section('title', 'Reports | Imprint HRIS')
+@section('heading', 'HR Reports')
 
-<x-header />
-
-<main class="page">
-    <section class="page-header">
+@section('content')
+    <div class="page-head">
         <div>
-            <span class="badge">Analytics</span>
             <h1>HR Reports</h1>
-            <p>Overview of workforce, attendance, leave, and payroll data.</p>
+            <p>Overview of workforce, attendance, leave, and payroll.</p>
         </div>
-    </section>
+    </div>
 
-    <section class="summary-grid">
-        <div class="summary-card"><span>Total Employees</span><strong>{{ $totalEmployees }}</strong></div>
-        <div class="summary-card"><span>Departments</span><strong>{{ count($headcountByDept) }}</strong></div>
-        <div class="summary-card"><span>Total Net Pay (Paid)</span><strong>₱{{ number_format($totalPaid, 0) }}</strong></div>
-        <div class="summary-card"><span>Generated</span><strong style="font-size:18px;">{{ now()->format('M d, Y') }}</strong></div>
-    </section>
+    <div class="stat-grid">
+        <div class="stat"><div class="stat-label">Total Employees</div><div class="stat-value">{{ $totalEmployees }}</div></div>
+        <div class="stat"><div class="stat-label">Departments</div><div class="stat-value">{{ count($headcountByDept) }}</div></div>
+        <div class="stat"><div class="stat-label">Net Pay (Paid)</div><div class="stat-value">₱{{ number_format($totalPaid, 0) }}</div></div>
+        <div class="stat"><div class="stat-label">Generated</div><div class="stat-value" style="font-size:18px;">{{ now()->format('M d, Y') }}</div></div>
+    </div>
 
-    <section class="detail-grid">
-        <div class="detail-card">
-            <h2>Headcount by Department</h2>
-            @forelse($headcountByDept as $row)
-                <div class="detail-row"><span>{{ $row->department ?? 'Unassigned' }}</span><strong>{{ $row->total }}</strong></div>
-            @empty
-                <p style="color:#6b7280;">No data.</p>
-            @endforelse
-        </div>
-
-        <div class="detail-card">
-            <h2>Attendance Summary</h2>
-            @forelse($attendanceSummary as $row)
-                <div class="detail-row"><span>{{ $row->status }}</span><strong>{{ $row->total }}</strong></div>
-            @empty
-                <p style="color:#6b7280;">No data.</p>
-            @endforelse
+    <div class="grid-2">
+        <div class="card">
+            <div class="card-head"><h2>Headcount by Department</h2></div>
+            <div class="card-body">
+                @forelse($headcountByDept as $row)
+                    <div class="info-row"><span class="k">{{ $row->department ?? 'Unassigned' }}</span><span class="v">{{ $row->total }}</span></div>
+                @empty
+                    <p class="muted">No data.</p>
+                @endforelse
+            </div>
         </div>
 
-        <div class="detail-card">
-            <h2>Leave Summary</h2>
-            @forelse($leaveSummary as $row)
-                <div class="detail-row"><span>{{ $row->status }}</span><strong>{{ $row->total }}</strong></div>
-            @empty
-                <p style="color:#6b7280;">No data.</p>
-            @endforelse
+        <div class="card">
+            <div class="card-head"><h2>Attendance Summary</h2></div>
+            <div class="card-body">
+                @forelse($attendanceSummary as $row)
+                    <div class="info-row"><span class="k">{{ $row->status }}</span><span class="v">{{ $row->total }}</span></div>
+                @empty
+                    <p class="muted">No data.</p>
+                @endforelse
+            </div>
         </div>
 
-        <div class="detail-card">
-            <h2>Payroll by Period</h2>
-            @forelse($payrollByMonth as $row)
-                <div class="detail-row"><span>{{ $row->payroll_month }} {{ $row->payroll_year }} ({{ $row->records }})</span><strong>₱{{ number_format($row->total_net, 2) }}</strong></div>
-            @empty
-                <p style="color:#6b7280;">No data.</p>
-            @endforelse
+        <div class="card">
+            <div class="card-head"><h2>Leave Summary</h2></div>
+            <div class="card-body">
+                @forelse($leaveSummary as $row)
+                    <div class="info-row"><span class="k">{{ $row->status }}</span><span class="v">{{ $row->total }}</span></div>
+                @empty
+                    <p class="muted">No data.</p>
+                @endforelse
+            </div>
         </div>
-    </section>
-</main>
 
-@include('components.page-style')
-
-</body>
-</html>
+        <div class="card">
+            <div class="card-head"><h2>Payroll by Period</h2></div>
+            <div class="card-body">
+                @forelse($payrollByMonth as $row)
+                    <div class="info-row"><span class="k">{{ $row->payroll_month }} {{ $row->payroll_year }} ({{ $row->records }})</span><span class="v">₱{{ number_format($row->total_net, 2) }}</span></div>
+                @empty
+                    <p class="muted">No data.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
+@endsection
