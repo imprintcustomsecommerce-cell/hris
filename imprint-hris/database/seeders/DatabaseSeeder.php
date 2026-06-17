@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
         $accounts = [
             ['name' => 'System Administrator', 'email' => 'admin@imprintcustoms.ph', 'role' => 'Admin'],
             ['name' => 'HR Officer', 'email' => 'hr@imprintcustoms.ph', 'role' => 'HR'],
+            ['name' => 'Department Manager', 'email' => 'manager@imprintcustoms.ph', 'role' => 'Manager'],
             ['name' => 'Employee Portal', 'email' => 'employee@imprintcustoms.ph', 'role' => 'Employee'],
         ];
 

@@ -47,7 +47,11 @@ Route::middleware('guest')->group(function () {
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
-            return redirect()->intended(Auth::user()->role === 'Employee' ? '/portal' : '/dashboard');
+            return redirect()->intended(match (Auth::user()->role) {
+                'Employee' => '/portal',
+                'Manager' => '/tasks',
+                default => '/dashboard',
+            });
         }
 
         RateLimiter::hit($throttleKey); // 1 minute decay (default)
@@ -73,7 +77,98 @@ Route::get('/', function () {
         return view('auth.login');
     }
 
-    return redirect(Auth::user()->role === 'Employee' ? '/portal' : '/dashboard');
+    return redirect(match (Auth::user()->role) {
+        'Employee' => '/portal',
+        'Manager' => '/tasks',
+        default => '/dashboard',
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Notifications (all signed-in users)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'password.changed'])->group(function () {
+    Route::get('/notifications', function () {
+        $notifications = DB::table('notifications')
+            ->where('user_id', Auth::id())
+            ->orderBy('id', 'desc')
+            ->limit(50)
+            ->get();
+
+        // Mark all as read on view.
+        DB::table('notifications')->where('user_id', Auth::id())->whereNull('read_at')->update(['read_at' => now()]);
+
+        return view('notifications.index', ['notifications' => $notifications]);
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Tasks — assigned by Admin / HR / Manager
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
+
+    Route::get('/tasks', function () {
+        $tasks = DB::table('tasks')
+            ->join('employees', 'tasks.assigned_to', '=', 'employees.id')
+            ->leftJoin('users', 'tasks.assigned_by', '=', 'users.id')
+            ->select('tasks.*', 'employees.name as employee_name', 'employees.position', 'users.name as assigner_name')
+            ->orderBy('tasks.id', 'desc')
+            ->get();
+
+        return view('tasks.index', [
+            'tasks' => $tasks,
+            'employees' => DB::table('employees')->where('status', 'Active')->orderBy('name')->get(),
+            'totalTasks' => DB::table('tasks')->count(),
+            'pendingTasks' => DB::table('tasks')->where('status', 'Pending')->count(),
+            'inProgressTasks' => DB::table('tasks')->where('status', 'In Progress')->count(),
+            'completedTasks' => DB::table('tasks')->where('status', 'Completed')->count(),
+        ]);
+    });
+
+    Route::post('/tasks', function (Request $request) {
+        $request->validate([
+            'assigned_to' => 'required|exists:employees,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'required|in:Low,Medium,High',
+            'due_date' => 'nullable|date',
+        ]);
+
+        DB::table('tasks')->insert([
+            'title' => $request->title,
+            'description' => $request->description,
+            'assigned_to' => $request->assigned_to,
+            'assigned_by' => Auth::id(),
+            'priority' => $request->priority,
+            'due_date' => $request->due_date,
+            'status' => 'Pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Notify the assigned employee's login account (if any).
+        $recipient = DB::table('users')->where('employee_id', $request->assigned_to)->first();
+        if ($recipient) {
+            DB::table('notifications')->insert([
+                'user_id' => $recipient->id,
+                'message' => Auth::user()->name . ' assigned you a task: "' . $request->title . '"',
+                'url' => '/portal/tasks',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        return redirect('/tasks')->with('success', 'Task assigned successfully.');
+    });
+
+    Route::delete('/tasks/{id}', function ($id) {
+        DB::table('tasks')->where('id', $id)->delete();
+        return redirect('/tasks')->with('success', 'Task deleted.');
+    });
 });
 
 /*
@@ -110,7 +205,7 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
     Route::get('/', function () use ($myEmployee) {
         $me = $myEmployee();
 
-        $data = ['me' => $me, 'recentAttendance' => collect(), 'pendingLeaves' => 0, 'lastPayslip' => null, 'leaveCount' => 0, 'payslipCount' => 0];
+        $data = ['me' => $me, 'recentAttendance' => collect(), 'pendingLeaves' => 0, 'lastPayslip' => null, 'leaveCount' => 0, 'payslipCount' => 0, 'openTasks' => 0, 'myTasks' => collect()];
 
         if ($me) {
             $data['recentAttendance'] = DB::table('attendances')->where('employee_id', $me->id)
@@ -120,6 +215,9 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             $data['payslipCount'] = DB::table('payrolls')->where('employee_id', $me->id)->count();
             $data['lastPayslip'] = DB::table('payrolls')->where('employee_id', $me->id)
                 ->orderBy('id', 'desc')->first();
+            $data['openTasks'] = DB::table('tasks')->where('assigned_to', $me->id)->where('status', '!=', 'Completed')->count();
+            $data['myTasks'] = DB::table('tasks')->where('assigned_to', $me->id)
+                ->orderBy('id', 'desc')->limit(5)->get();
         }
 
         return view('portal.dashboard', $data);
@@ -191,6 +289,47 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             ->first();
         abort_if(! $payroll, 404);
         return view('payroll.payslip', ['payroll' => $payroll]);
+    });
+
+    Route::get('/tasks', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $tasks = $me
+            ? DB::table('tasks')
+                ->leftJoin('users', 'tasks.assigned_by', '=', 'users.id')
+                ->select('tasks.*', 'users.name as assigner_name')
+                ->where('tasks.assigned_to', $me->id)
+                ->orderBy('tasks.id', 'desc')
+                ->get()
+            : collect();
+
+        return view('portal.tasks', ['me' => $me, 'tasks' => $tasks]);
+    });
+
+    Route::patch('/tasks/{id}/status', function (Request $request, $id) use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403);
+
+        $request->validate(['status' => 'required|in:Pending,In Progress,Completed']);
+
+        // Ownership: only the assigned employee may update their task.
+        $task = DB::table('tasks')->where('id', $id)->where('assigned_to', $me->id)->first();
+        abort_if(! $task, 404);
+
+        DB::table('tasks')->where('id', $id)->update([
+            'status' => $request->status,
+            'updated_at' => now(),
+        ]);
+
+        // Notify the assigner of the update.
+        DB::table('notifications')->insert([
+            'user_id' => $task->assigned_by,
+            'message' => $me->name . ' marked task "' . $task->title . '" as ' . $request->status,
+            'url' => '/tasks',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect('/portal/tasks')->with('success', 'Task status updated.');
     });
 });
 

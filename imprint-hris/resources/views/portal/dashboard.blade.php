@@ -72,7 +72,8 @@
             <div class="card">
                 <div class="card-head"><div><h2>Quick Actions</h2></div></div>
                 <div class="card-body" style="padding:20px 24px 24px; display:grid; gap:10px;">
-                    <a href="/portal/leave" class="btn btn-primary" style="width:100%;">Request Leave</a>
+                    <a href="/portal/tasks" class="btn btn-primary" style="width:100%;">My Tasks @if($openTasks > 0)({{ $openTasks }} open)@endif</a>
+                    <a href="/portal/leave" class="btn btn-ghost" style="width:100%;">Request Leave</a>
                     <a href="/portal/payslips" class="btn btn-ghost" style="width:100%;">View Payslips</a>
                     <a href="/portal/profile" class="btn btn-ghost" style="width:100%;">My Profile</a>
                 </div>
