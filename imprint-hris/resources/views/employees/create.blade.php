@@ -64,11 +64,40 @@
                     </div>
                 </div>
 
+                <div class="form-section">
+                    <h3>Portal Login (optional)</h3>
+                    <label class="acct-toggle">
+                        <input type="checkbox" name="create_account" value="1" id="create_account" {{ old('create_account') ? 'checked' : '' }}>
+                        <span>Create a self-service portal login for this employee</span>
+                    </label>
+                    <div class="form-grid" id="acct-fields" style="margin-top:18px;">
+                        <div class="field">
+                            <label>Temporary Password</label>
+                            <input type="text" name="temp_password" value="{{ old('temp_password', 'imprint123') }}" minlength="6">
+                            <small style="color:var(--muted); font-weight:500;">The employee must change this on first sign-in. Login uses the email address above.</small>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <a href="/employees" class="btn btn-ghost">Cancel</a>
                     <button type="submit" class="btn btn-primary">Save Employee</button>
                 </div>
             </form>
+
+            <script>
+                (function () {
+                    const cb = document.getElementById('create_account');
+                    const fields = document.getElementById('acct-fields');
+                    const sync = () => fields.style.display = cb.checked ? '' : 'none';
+                    cb.addEventListener('change', sync); sync();
+                })();
+            </script>
+
+            <style>
+                .acct-toggle { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:#334155; cursor:pointer; }
+                .acct-toggle input { width:18px; height:18px; }
+            </style>
         </div>
     </div>
 @endsection

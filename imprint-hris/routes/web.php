@@ -3,9 +3,11 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use App\Models\User;
 use Carbon\Carbon;
 
 /*
@@ -79,10 +81,31 @@ Route::get('/', function () {
 | Employee Self-Service Portal
 |--------------------------------------------------------------------------
 */
-Route::middleware(['auth', 'role:Employee'])->prefix('portal')->group(function () {
+Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal')->group(function () {
 
     // Resolve the linked employee record (shared by all portal routes).
     $myEmployee = fn () => DB::table('employees')->where('id', Auth::user()->employee_id)->first();
+
+    // Change password (also the forced landing for temp-password accounts).
+    Route::get('/password', function () {
+        return view('portal.password');
+    });
+
+    Route::post('/password', function (Request $request) {
+        $user = $request->user();
+
+        $request->validate([
+            'current_password' => 'required|current_password',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user->forceFill([
+            'password' => Hash::make($request->password),
+            'must_change_password' => false,
+        ])->save();
+
+        return redirect('/portal')->with('success', 'Your password has been updated.');
+    });
 
     Route::get('/', function () use ($myEmployee) {
         $me = $myEmployee();
@@ -307,9 +330,18 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'date_hired' => 'required|date',
             'employment_type' => 'nullable|string|max:255',
             'status' => 'required|string|max:255',
+            'create_account' => 'nullable|boolean',
+            'temp_password' => 'nullable|required_if:create_account,1|string|min:6',
         ]);
 
-        DB::table('employees')->insert([
+        // A login account needs a unique email as the identifier.
+        if ($request->boolean('create_account')) {
+            $request->validate([
+                'email' => 'required|email|unique:users,email',
+            ], [], ['email' => 'email address']);
+        }
+
+        $newId = DB::table('employees')->insertGetId([
             'name' => $request->name,
             'email' => $request->email,
             'contact_number' => $request->contact_number,
@@ -325,7 +357,22 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'updated_at' => now(),
         ]);
 
-        return redirect('/employees')->with('success', 'Employee added successfully.');
+        $message = 'Employee added successfully.';
+
+        if ($request->boolean('create_account')) {
+            User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'role' => 'Employee',
+                'employee_id' => $newId,
+                'password' => Hash::make($request->temp_password),
+                'must_change_password' => true,
+            ]);
+
+            $message = 'Employee added and portal login created. They must change the temporary password on first sign-in.';
+        }
+
+        return redirect('/employees')->with('success', $message);
     })->middleware('role:Admin,HR');
 
     Route::get('/employees/{id}', function ($id) {
@@ -339,13 +386,56 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         $payrolls = DB::table('payrolls')->where('employee_id', $id)
             ->orderBy('id', 'desc')->limit(5)->get();
 
+        $account = DB::table('users')->where('employee_id', $id)->first();
+
         return view('employees.show', [
             'employee' => $employee,
             'attendance' => $attendance,
             'leaves' => $leaves,
             'payrolls' => $payrolls,
+            'account' => $account,
         ]);
     });
+
+    // Create or reset a portal login account for an employee.
+    Route::post('/employees/{id}/account', function (Request $request, $id) {
+        $employee = DB::table('employees')->where('id', $id)->first();
+        abort_if(! $employee, 404);
+
+        $request->validate([
+            'email' => 'required|email',
+            'temp_password' => 'required|string|min:6',
+        ]);
+
+        $existing = DB::table('users')->where('employee_id', $id)->first();
+
+        // Email must be unique across users (ignoring this employee's own account).
+        $request->validate([
+            'email' => 'unique:users,email' . ($existing ? ',' . $existing->id : ''),
+        ], [], ['email' => 'email address']);
+
+        if ($existing) {
+            User::where('id', $existing->id)->update([
+                'name' => $employee->name,
+                'email' => $request->email,
+                'password' => Hash::make($request->temp_password),
+                'must_change_password' => true,
+            ]);
+            $msg = 'Login account reset. The employee must set a new password on next sign-in.';
+        } else {
+            User::create([
+                'name' => $employee->name,
+                'email' => $request->email,
+                'role' => 'Employee',
+                'employee_id' => $employee->id,
+                'password' => Hash::make($request->temp_password),
+                'must_change_password' => true,
+            ]);
+            $msg = 'Portal login created. Share the temporary password with the employee.';
+        }
+
+        return redirect('/employees/' . $id)->with('success', $msg);
+    })->middleware('role:Admin,HR');
 
     Route::get('/employees/{id}/edit', function ($id) {
         $employee = DB::table('employees')->where('id', $id)->first();

@@ -91,4 +91,41 @@
             </div>
         </div>
     </div>
+
+    @if(in_array(auth()->user()->role, ['Admin', 'HR']))
+        <div class="card" style="margin-top:18px;">
+            <div class="card-head">
+                <div>
+                    <h2>Portal Login Account</h2>
+                    <p>
+                        @if($account)
+                            Active — <strong>{{ $account->email }}</strong>
+                            @if($account->must_change_password) · <span class="badge amber">temp password (pending change)</span> @endif
+                        @else
+                            No login account yet for this employee.
+                        @endif
+                    </p>
+                </div>
+            </div>
+            <div class="card-body" style="padding:20px 24px 24px;">
+                <form action="/employees/{{ $employee->id }}/account" method="POST" class="form-grid" style="align-items:end;">
+                    @csrf
+                    <div class="field">
+                        <label>Login Email</label>
+                        <input type="email" name="email" value="{{ old('email', $account->email ?? $employee->email) }}" required>
+                    </div>
+                    <div class="field">
+                        <label>Temporary Password</label>
+                        <input type="text" name="temp_password" value="imprint123" minlength="6" required>
+                    </div>
+                    <div class="field full">
+                        <button type="submit" class="btn {{ $account ? 'btn-ghost' : 'btn-primary' }}">
+                            {{ $account ? 'Reset Login & Password' : 'Create Portal Login' }}
+                        </button>
+                        <small style="color:var(--muted); font-weight:500; margin-left:8px;">The employee will be required to set their own password on first sign-in.</small>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 @endsection

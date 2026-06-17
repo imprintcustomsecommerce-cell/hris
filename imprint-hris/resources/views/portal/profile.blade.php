@@ -17,6 +17,9 @@
                     <p>{{ $me->position }} · {{ $me->department }}</p>
                 </div>
             </div>
+            <div class="head-actions">
+                <a href="/portal/password" class="btn btn-ghost">🔒 Change Password</a>
+            </div>
         </div>
 
         <div class="grid-2">
