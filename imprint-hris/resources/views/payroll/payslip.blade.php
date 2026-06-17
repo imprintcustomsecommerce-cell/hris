@@ -21,7 +21,7 @@
         <div class="ps-brand">
             <img src="{{ asset('logoic.png') }}" alt="Imprint Customs">
             <div>
-                <h1>Imprint Customs</h1>
+                <h1>{{ \App\Support\Setting::get('company_name', 'Imprint Customs') }}</h1>
                 <span>Payslip</span>
             </div>
         </div>
@@ -54,6 +54,7 @@
             <div class="ps-row"><span>PhilHealth</span><strong>₱{{ number_format($payroll->philhealth, 2) }}</strong></div>
             <div class="ps-row"><span>Pag-IBIG</span><strong>₱{{ number_format($payroll->pagibig, 2) }}</strong></div>
             <div class="ps-row"><span>Withholding Tax</span><strong>₱{{ number_format($payroll->tax, 2) }}</strong></div>
+            <div class="ps-row"><span>Loan / Cash Advance</span><strong>₱{{ number_format($payroll->loan_deduction, 2) }}</strong></div>
             <div class="ps-row"><span>Other</span><strong>₱{{ number_format($payroll->other_deductions, 2) }}</strong></div>
             <div class="ps-row total"><span>Total Deductions</span><strong>₱{{ number_format($payroll->deductions, 2) }}</strong></div>
         </div>

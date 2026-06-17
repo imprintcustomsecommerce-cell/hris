@@ -77,8 +77,8 @@
                 <div class="form-section">
                     <h3>Leave Credits (annual)</h3>
                     <div class="form-grid">
-                        <div class="field"><label>Vacation Leave days</label><input type="number" name="vacation_credits" value="{{ old('vacation_credits', 15) }}" min="0" max="365"></div>
-                        <div class="field"><label>Sick Leave days</label><input type="number" name="sick_credits" value="{{ old('sick_credits', 15) }}" min="0" max="365"></div>
+                        <div class="field"><label>Vacation Leave days</label><input type="number" name="vacation_credits" value="{{ old('vacation_credits', $defaultVacation ?? 15) }}" min="0" max="365"></div>
+                        <div class="field"><label>Sick Leave days</label><input type="number" name="sick_credits" value="{{ old('sick_credits', $defaultSick ?? 15) }}" min="0" max="365"></div>
                     </div>
                 </div>
 

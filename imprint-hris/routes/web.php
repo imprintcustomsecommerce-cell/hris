@@ -16,6 +16,8 @@ use App\Support\LeaveBalance;
 use App\Support\Notify;
 use App\Support\Workdays;
 use App\Support\PayrollCalculator;
+use App\Support\Setting;
+use App\Support\Shift;
 use Carbon\Carbon;
 
 /*
@@ -383,16 +385,18 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             return redirect('/portal')->with('success', 'You already clocked in today.');
         }
 
-        $status = now()->format('H:i') > '09:00' ? 'Late' : 'Present';
+        $timeIn = now()->format('H:i:s');
+        $status = Shift::isLate($timeIn) ? 'Late' : 'Present';
+        $lateMinutes = Shift::metrics($timeIn, null)['late'];
 
         if ($existing) {
             DB::table('attendances')->where('id', $existing->id)->update([
-                'time_in' => now()->format('H:i:s'), 'status' => $status, 'updated_at' => now(),
+                'time_in' => $timeIn, 'status' => $status, 'late_minutes' => $lateMinutes, 'updated_at' => now(),
             ]);
         } else {
             DB::table('attendances')->insert([
                 'employee_id' => $me->id, 'attendance_date' => $today,
-                'time_in' => now()->format('H:i:s'), 'status' => $status,
+                'time_in' => $timeIn, 'status' => $status, 'late_minutes' => $lateMinutes,
                 'created_at' => now(), 'updated_at' => now(),
             ]);
         }
@@ -411,8 +415,14 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             return redirect('/portal')->with('success', 'Please clock in first.');
         }
 
+        $timeOut = now()->format('H:i:s');
+        $m = Shift::metrics($existing->time_in, $timeOut);
+
         DB::table('attendances')->where('id', $existing->id)->update([
-            'time_out' => now()->format('H:i:s'), 'updated_at' => now(),
+            'time_out' => $timeOut,
+            'undertime_minutes' => $m['undertime'],
+            'overtime_minutes' => $m['overtime'],
+            'updated_at' => now(),
         ]);
 
         return redirect('/portal')->with('success', 'Clocked out at ' . now()->format('h:i A') . '.');
@@ -711,6 +721,8 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         return view('employees.create', [
             'departments' => DB::table('departments')->orderBy('name')->get(),
             'managers' => DB::table('employees')->orderBy('name')->get(),
+            'defaultVacation' => (int) Setting::get('default_vacation_credits', 15),
+            'defaultSick' => (int) Setting::get('default_sick_credits', 15),
         ]);
     })->middleware('role:Admin,HR');
 
@@ -1028,12 +1040,16 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ]);
         }
 
+        $m = Shift::metrics($request->time_in, $request->time_out);
         DB::table('attendances')->insert([
             'employee_id' => $request->employee_id,
             'attendance_date' => $request->attendance_date,
             'time_in' => $request->time_in,
             'time_out' => $request->time_out,
             'status' => $request->status,
+            'late_minutes' => $m['late'],
+            'undertime_minutes' => $m['undertime'],
+            'overtime_minutes' => $m['overtime'],
             'remarks' => $request->remarks,
             'created_at' => now(),
             'updated_at' => now(),
@@ -1072,12 +1088,16 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ]);
         }
 
+        $m = Shift::metrics($request->time_in, $request->time_out);
         DB::table('attendances')->where('id', $id)->update([
             'employee_id' => $request->employee_id,
             'attendance_date' => $request->attendance_date,
             'time_in' => $request->time_in,
             'time_out' => $request->time_out,
             'status' => $request->status,
+            'late_minutes' => $m['late'],
+            'undertime_minutes' => $m['undertime'],
+            'overtime_minutes' => $m['overtime'],
             'remarks' => $request->remarks,
             'updated_at' => now(),
         ]);
@@ -1255,7 +1275,15 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
 
         // Auto-compute PH statutory contributions + withholding tax.
         $stat = PayrollCalculator::deductions($basicSalary);
-        $totalDeductions = $stat['sss'] + $stat['philhealth'] + $stat['pagibig'] + $stat['tax'] + $otherDeductions;
+
+        // Active loan amortization for this employee (capped at outstanding balance).
+        $loanDeduction = (float) DB::table('loans')
+            ->where('employee_id', $request->employee_id)
+            ->where('status', 'Active')
+            ->get()
+            ->sum(fn ($l) => min((float) $l->monthly_amortization, (float) $l->balance));
+
+        $totalDeductions = $stat['sss'] + $stat['philhealth'] + $stat['pagibig'] + $stat['tax'] + $otherDeductions + $loanDeduction;
 
         $grossPay = $basicSalary + $allowances + $overtimePay;
         $netPay = $grossPay - $totalDeductions;
@@ -1272,6 +1300,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'pagibig' => $stat['pagibig'],
             'tax' => $stat['tax'],
             'other_deductions' => $otherDeductions,
+            'loan_deduction' => round($loanDeduction, 2),
             'deductions' => round($totalDeductions, 2),
             'gross_pay' => $grossPay,
             'net_pay' => $netPay,
@@ -1320,18 +1349,35 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     });
 
     Route::patch('/payroll/{id}/paid', function ($id) {
+        $pay = DB::table('payrolls')->where('id', $id)->first();
+        abort_if(! $pay, 404);
+
         DB::table('payrolls')->where('id', $id)->update([
             'status' => 'Paid',
             'payment_date' => now()->toDateString(),
             'updated_at' => now(),
         ]);
 
-        $pay = DB::table('payrolls')->where('id', $id)->first();
-        if ($pay) {
-            $recipient = DB::table('users')->where('employee_id', $pay->employee_id)->first();
-            if ($recipient) {
-                Notify::send($recipient->id, 'Your payslip for ' . $pay->payroll_month . ' ' . $pay->payroll_year . ' is now available.', '/portal/payslips');
+        // Apply this payroll's loan deduction against the employee's active loans.
+        if ($pay->loan_deduction > 0) {
+            $remaining = (float) $pay->loan_deduction;
+            $loans = DB::table('loans')->where('employee_id', $pay->employee_id)->where('status', 'Active')->orderBy('id')->get();
+            foreach ($loans as $loan) {
+                if ($remaining <= 0) break;
+                $pay_amt = min($remaining, (float) $loan->monthly_amortization, (float) $loan->balance);
+                $newBalance = round((float) $loan->balance - $pay_amt, 2);
+                DB::table('loans')->where('id', $loan->id)->update([
+                    'balance' => $newBalance,
+                    'status' => $newBalance <= 0 ? 'Paid' : 'Active',
+                    'updated_at' => now(),
+                ]);
+                $remaining -= $pay_amt;
             }
+        }
+
+        $recipient = DB::table('users')->where('employee_id', $pay->employee_id)->first();
+        if ($recipient) {
+            Notify::send($recipient->id, 'Your payslip for ' . $pay->payroll_month . ' ' . $pay->payroll_year . ' is now available.', '/portal/payslips');
         }
         Audit::log('payroll.paid', Auth::user()->name . ' marked a payroll as paid');
 
@@ -1493,6 +1539,80 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         DB::table('announcements')->where('id', $id)->delete();
         return redirect('/announcements')->with('success', 'Announcement removed.');
     })->middleware('role:Admin,HR');
+
+    /*
+    | Loans / Cash Advances
+    */
+    Route::get('/loans', function () {
+        $loans = DB::table('loans')
+            ->join('employees', 'loans.employee_id', '=', 'employees.id')
+            ->select('loans.*', 'employees.name as employee_name', 'employees.employee_id as code')
+            ->orderBy('loans.status')->orderBy('loans.id', 'desc')
+            ->get();
+
+        return view('loans.index', [
+            'loans' => $loans,
+            'employees' => DB::table('employees')->where('status', 'Active')->orderBy('name')->get(),
+            'activeTotal' => DB::table('loans')->where('status', 'Active')->sum('balance'),
+        ]);
+    });
+
+    Route::post('/loans', function (Request $request) {
+        $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'type' => 'required|in:Loan,Cash Advance',
+            'principal' => 'required|numeric|min:1',
+            'monthly_amortization' => 'required|numeric|min:1',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        DB::table('loans')->insert([
+            'employee_id' => $request->employee_id,
+            'type' => $request->type,
+            'principal' => $request->principal,
+            'monthly_amortization' => $request->monthly_amortization,
+            'balance' => $request->principal,
+            'status' => 'Active',
+            'reason' => $request->reason,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Audit::log('loan.create', Auth::user()->name . ' recorded a ' . $request->type);
+        return redirect('/loans')->with('success', 'Loan / cash advance recorded.');
+    })->middleware('role:Admin,HR');
+
+    Route::delete('/loans/{id}', function ($id) {
+        DB::table('loans')->where('id', $id)->delete();
+        return redirect('/loans')->with('success', 'Loan removed.');
+    })->middleware('role:Admin,HR');
+
+    /*
+    | Settings (Admin only)
+    */
+    Route::get('/settings', function () {
+        return view('settings.index', [
+            'settings' => DB::table('settings')->pluck('value', 'key')->all(),
+        ]);
+    })->middleware('role:Admin');
+
+    Route::post('/settings', function (Request $request) {
+        $request->validate([
+            'company_name' => 'required|string|max:255',
+            'shift_start' => 'required|date_format:H:i',
+            'shift_end' => 'required|date_format:H:i',
+            'grace_minutes' => 'required|integer|min:0|max:240',
+            'default_vacation_credits' => 'required|integer|min:0|max:365',
+            'default_sick_credits' => 'required|integer|min:0|max:365',
+        ]);
+
+        foreach (['company_name', 'shift_start', 'shift_end', 'grace_minutes', 'default_vacation_credits', 'default_sick_credits'] as $key) {
+            Setting::set($key, $request->input($key));
+        }
+
+        Audit::log('settings.update', Auth::user()->name . ' updated system settings');
+        return redirect('/settings')->with('success', 'Settings saved.');
+    })->middleware('role:Admin');
 
     /*
     | Audit log (Admin only)

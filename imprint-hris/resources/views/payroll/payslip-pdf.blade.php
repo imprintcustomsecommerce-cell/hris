@@ -38,7 +38,7 @@
 <div class="wrap">
     <table class="head">
         <tr>
-            <td><div class="company">Imprint Customs</div><div class="doc">Payslip</div></td>
+            <td><div class="company">{{ \App\Support\Setting::get('company_name', 'Imprint Customs') }}</div><div class="doc">Payslip</div></td>
             <td class="period"><div>Pay Period</div><strong>{{ $payroll->payroll_month }} {{ $payroll->payroll_year }}</strong></td>
         </tr>
     </table>
@@ -76,6 +76,7 @@
                     <tr><td>PhilHealth</td><td class="amt">{{ number_format($payroll->philhealth, 2) }}</td></tr>
                     <tr><td>Pag-IBIG</td><td class="amt">{{ number_format($payroll->pagibig, 2) }}</td></tr>
                     <tr><td>Withholding Tax</td><td class="amt">{{ number_format($payroll->tax, 2) }}</td></tr>
+                    <tr><td>Loan / Cash Advance</td><td class="amt">{{ number_format($payroll->loan_deduction, 2) }}</td></tr>
                     <tr><td>Other</td><td class="amt">{{ number_format($payroll->other_deductions, 2) }}</td></tr>
                     <tr class="total"><td>Total Deductions</td><td class="amt">{{ number_format($payroll->deductions, 2) }}</td></tr>
                 </table>

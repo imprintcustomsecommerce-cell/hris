@@ -41,6 +41,7 @@
                 <div class="info-row"><span class="k">PhilHealth</span><span class="v">− ₱{{ number_format($payroll->philhealth, 2) }}</span></div>
                 <div class="info-row"><span class="k">Pag-IBIG</span><span class="v">− ₱{{ number_format($payroll->pagibig, 2) }}</span></div>
                 <div class="info-row"><span class="k">Withholding Tax</span><span class="v">− ₱{{ number_format($payroll->tax, 2) }}</span></div>
+                <div class="info-row"><span class="k">Loan / Cash Advance</span><span class="v">− ₱{{ number_format($payroll->loan_deduction, 2) }}</span></div>
                 <div class="info-row"><span class="k">Other Deductions</span><span class="v">− ₱{{ number_format($payroll->other_deductions, 2) }}</span></div>
                 <div class="info-row"><span class="k">Total Deductions</span><span class="v">− ₱{{ number_format($payroll->deductions, 2) }}</span></div>
                 <div class="info-row"><span class="k">Net Pay</span><span class="v" style="font-size:18px; color:var(--accent);">₱{{ number_format($payroll->net_pay, 2) }}</span></div>
