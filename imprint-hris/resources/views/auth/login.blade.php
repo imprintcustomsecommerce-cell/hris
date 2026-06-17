@@ -86,7 +86,7 @@
     .auth-card h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -.03em; }
     .sub { margin: 0 0 28px; color: var(--muted); font-size: 15px; }
 
-    .auth-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; padding: 13px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; margin-bottom: 20px; }
+    .auth-error { background: #f4f4f5; color: #0a0a0a; border: 1px solid #e4e4e7; border-left: 4px solid #0a0a0a; padding: 13px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; margin-bottom: 20px; }
 
     .field { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
     .field label { font-size: 13px; font-weight: 700; color: #334155; }

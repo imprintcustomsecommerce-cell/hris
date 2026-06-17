@@ -12,7 +12,7 @@
     </div>
 
     @if(auth()->user()->must_change_password)
-        <div class="alert alert-error" style="background:#fef3c7;color:#92400e;border-color:#fde68a;">
+        <div class="alert alert-error">
             For your security, please change your temporary password before continuing.
         </div>
     @endif

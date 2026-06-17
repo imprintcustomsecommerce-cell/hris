@@ -283,8 +283,8 @@
     .bell svg { width: 20px; height: 20px; }
     .bell-dot {
         position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px;
-        background: #ef4444; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800;
-        display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg);
+        background: var(--btn); color: var(--btn-text); border-radius: 999px; font-size: 11px; font-weight: 800;
+        display: flex; align-items: center; justify-content: center; border: 2px solid var(--card);
     }
 
     .content { padding: 32px 40px 60px; max-width: 1320px; width: 100%; }
@@ -298,8 +298,8 @@
         margin-bottom: 22px;
     }
     .alert svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
-    .alert-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; display: block; }
+    .alert-success { background: var(--accent-soft); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--btn); }
+    .alert-error { background: var(--accent-soft); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--text); display: block; }
     .alert-error strong { display: block; margin-bottom: 6px; }
     .alert-error ul { margin: 0; padding-left: 18px; font-weight: 500; }
 
@@ -321,11 +321,11 @@
     .btn-primary:hover { background: var(--btn-hover); }
     .btn-ghost { background: var(--card); color: var(--text); border: 1px solid var(--border); }
     .btn-ghost:hover { border-color: #cbd5e1; background: #f8fafc; }
-    .btn-danger { background: #fef2f2; color: #b91c1c; }
-    .btn-danger:hover { background: #ef4444; color: #fff; }
+    .btn-danger { background: transparent; color: var(--text); border: 1px solid var(--border); }
+    .btn-danger:hover { background: var(--accent); color: var(--card); }
     .btn-sm { padding: 8px 13px; font-size: 13px; border-radius: 10px; }
-    .btn-success { background: #ecfdf5; color: #047857; }
-    .btn-success:hover { background: #10b981; color: #fff; }
+    .btn-success { background: var(--accent); color: var(--card); }
+    .btn-success:hover { background: var(--accent-dark); }
 
     /* ---------- Stat cards ---------- */
     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 26px; }
@@ -389,17 +389,19 @@
     .cell-user span { display: block; color: var(--muted); font-size: 12.5px; }
 
     /* ---------- Badges ---------- */
+    /* Monochrome status badges: filled = positive/done, outlined = pending, muted = negative */
     .badge {
         display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
-        border-radius: 999px; font-size: 12px; font-weight: 700;
-        background: #f1f5f9; color: #475569;
+        border: 1px solid transparent; border-radius: 999px; font-size: 12px; font-weight: 700;
+        background: var(--accent-soft); color: var(--text);
     }
     .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-    .badge.green { background: #dcfce7; color: #15803d; }
-    .badge.amber { background: #fef3c7; color: #b45309; }
-    .badge.red   { background: #fee2e2; color: #b91c1c; }
-    .badge.blue  { background: #dbeafe; color: #1d4ed8; }
-    .badge.gray  { background: #f1f5f9; color: #475569; }
+    .badge.green { background: var(--accent); color: var(--card); }                 /* solid */
+    .badge.amber { background: transparent; color: var(--text); border-color: var(--border); } /* outlined */
+    .badge.red   { background: var(--accent-soft); color: var(--muted); }            /* muted */
+    .badge.red::before { background: var(--text); box-shadow: 0 0 0 2px var(--accent-soft); }
+    .badge.blue  { background: var(--accent-soft); color: var(--text); }
+    .badge.gray  { background: var(--accent-soft); color: var(--muted); }
     .badge.plain::before { display: none; }
 
     /* ---------- Row actions ---------- */
