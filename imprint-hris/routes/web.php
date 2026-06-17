@@ -45,7 +45,7 @@ Route::middleware('guest')->group(function () {
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
-            return redirect()->intended('/');
+            return redirect()->intended('/dashboard');
         }
 
         RateLimiter::hit($throttleKey); // 1 minute decay (default)
@@ -60,8 +60,15 @@ Route::post('/logout', function (Request $request) {
     Auth::logout();
     $request->session()->invalidate();
     $request->session()->regenerateToken();
-    return redirect('/login');
+    return redirect('/');
 })->middleware('auth');
+
+/*
+| Landing page: show the login form to guests, dashboard to signed-in users.
+*/
+Route::get('/', function () {
+    return Auth::check() ? redirect('/dashboard') : view('auth.login');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -71,9 +78,9 @@ Route::post('/logout', function (Request $request) {
 Route::middleware('auth')->group(function () {
 
     /*
-    | Dashboard / Home Page
+    | Dashboard
     */
-    Route::get('/', function () {
+    Route::get('/dashboard', function () {
         $today = now()->toDateString();
 
         $stats = [

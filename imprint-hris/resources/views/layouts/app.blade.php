@@ -14,7 +14,7 @@
     $role = auth()->user()->role ?? 'Employee';
     $isManager = in_array($role, ['Admin', 'HR']);
     $nav = [
-        ['/', 'Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
+        ['/dashboard', 'Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
         ['/employees', 'Employees', 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-1.13a4 4 0 1 0-4-4 4 4 0 0 0 4 4z'],
         ['/departments', 'Departments', 'M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01'],
         ['/attendance', 'Attendance', 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
@@ -28,7 +28,7 @@
 
 <div class="shell">
     <aside class="sidebar">
-        <a href="/" class="brand">
+        <a href="/dashboard" class="brand">
             <div class="brand-icon"><img src="{{ asset('logoic.png') }}" alt="Imprint HRIS"></div>
             <div class="brand-text">
                 <span class="brand-name">Imprint HRIS</span>
