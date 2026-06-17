@@ -75,6 +75,7 @@ Route::middleware('guest')->group(function () {
             return redirect()->intended(match (Auth::user()->role) {
                 'Employee' => '/portal',
                 'Manager' => '/tasks',
+                'Applicant' => '/apply',
                 default => '/dashboard',
             });
         }
@@ -148,7 +149,109 @@ Route::get('/', function () {
     return redirect(match (Auth::user()->role) {
         'Employee' => '/portal',
         'Manager' => '/tasks',
+        'Applicant' => '/apply',
         default => '/dashboard',
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Shared account: change password (any signed-in user)
+|--------------------------------------------------------------------------
+*/
+Route::middleware('auth')->group(function () {
+    Route::get('/account/password', function () {
+        return view('account.password');
+    });
+
+    Route::post('/account/password', function (Request $request) {
+        $user = $request->user();
+        $request->validate([
+            'current_password' => 'required|current_password',
+            'password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user->forceFill([
+            'password' => Hash::make($request->password),
+            'must_change_password' => false,
+        ])->save();
+
+        $home = match ($user->role) {
+            'Employee' => '/portal',
+            'Manager' => '/tasks',
+            'Applicant' => '/apply',
+            default => '/dashboard',
+        };
+
+        return redirect($home)->with('success', 'Your password has been updated.');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Applicant Portal (temporary accounts)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:Applicant', 'password.changed'])->prefix('apply')->group(function () {
+
+    $me = fn () => DB::table('applicants')->where('id', Auth::user()->applicant_id)->first();
+
+    Route::get('/', function () use ($me) {
+        $applicant = $me();
+        $nextInterview = $applicant
+            ? DB::table('interviews')->where('applicant_id', $applicant->id)->where('status', 'Scheduled')
+                ->orderBy('scheduled_at')->first()
+            : null;
+        $docs = $applicant ? DB::table('applicant_documents')->where('applicant_id', $applicant->id)->count() : 0;
+
+        return view('apply.dashboard', ['me' => $applicant, 'nextInterview' => $nextInterview, 'docCount' => $docs]);
+    });
+
+    Route::get('/documents', function () use ($me) {
+        $applicant = $me();
+        $documents = $applicant
+            ? DB::table('applicant_documents')->where('applicant_id', $applicant->id)->orderBy('id', 'desc')->get()
+            : collect();
+        return view('apply.documents', ['me' => $applicant, 'documents' => $documents]);
+    });
+
+    Route::post('/documents', function (Request $request) use ($me) {
+        $applicant = $me();
+        abort_if(! $applicant, 403);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'document' => 'required|file|max:10240',
+        ]);
+
+        $path = $request->file('document')->store('applicant-documents');
+
+        DB::table('applicant_documents')->insert([
+            'applicant_id' => $applicant->id,
+            'name' => $request->name,
+            'category' => 'Requirement',
+            'file_path' => $path,
+            'original_name' => $request->file('document')->getClientOriginalName(),
+            'uploaded_by' => Auth::id(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect('/apply/documents')->with('success', 'Document submitted.');
+    });
+
+    Route::get('/documents/{id}/download', function ($id) use ($me) {
+        $applicant = $me();
+        $doc = DB::table('applicant_documents')->where('id', $id)->where('applicant_id', optional($applicant)->id)->first();
+        abort_if(! $doc || ! Storage::disk('local')->exists($doc->file_path), 404);
+        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+    });
+
+    Route::get('/interviews', function () use ($me) {
+        $applicant = $me();
+        $interviews = $applicant
+            ? DB::table('interviews')->where('applicant_id', $applicant->id)->orderBy('scheduled_at', 'desc')->get()
+            : collect();
+        return view('apply.interviews', ['me' => $applicant, 'interviews' => $interviews]);
     });
 });
 
@@ -1574,6 +1677,206 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     Route::delete('/announcements/{id}', function ($id) {
         DB::table('announcements')->where('id', $id)->delete();
         return redirect('/announcements')->with('success', 'Announcement removed.');
+    })->middleware('role:Admin,HR');
+
+    /*
+    | Recruitment — Applicants
+    */
+    Route::get('/applicants', function () {
+        return view('applicants.index', [
+            'applicants' => DB::table('applicants')->orderBy('id', 'desc')->get(),
+        ]);
+    });
+
+    Route::post('/applicants', function (Request $request) {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:255',
+            'position_applied' => 'required|string|max:255',
+            'create_account' => 'nullable|boolean',
+            'temp_password' => 'nullable|required_if:create_account,1|string|min:6',
+        ]);
+
+        if ($request->boolean('create_account')) {
+            $request->validate(['email' => 'required|email|unique:users,email'], [], ['email' => 'email address']);
+        }
+
+        $id = DB::table('applicants')->insertGetId([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'position_applied' => $request->position_applied,
+            'status' => 'Applied',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $msg = 'Applicant added.';
+        if ($request->boolean('create_account')) {
+            User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'role' => 'Applicant',
+                'applicant_id' => $id,
+                'password' => Hash::make($request->temp_password),
+                'must_change_password' => true,
+            ]);
+            $msg = 'Applicant added with a temporary portal login. Share the password so they can submit requirements.';
+        }
+
+        Audit::log('applicant.create', Auth::user()->name . ' added applicant ' . $request->name);
+        return redirect('/applicants/' . $id)->with('success', $msg);
+    })->middleware('role:Admin,HR');
+
+    Route::get('/applicants/{id}', function ($id) {
+        $applicant = DB::table('applicants')->where('id', $id)->first();
+        abort_if(! $applicant, 404);
+        return view('applicants.show', [
+            'applicant' => $applicant,
+            'account' => DB::table('users')->where('applicant_id', $id)->first(),
+            'interviews' => DB::table('interviews')->where('applicant_id', $id)->orderBy('scheduled_at', 'desc')->get(),
+            'documents' => DB::table('applicant_documents')->where('applicant_id', $id)->orderBy('id', 'desc')->get(),
+        ]);
+    });
+
+    Route::patch('/applicants/{id}/status', function (Request $request, $id) {
+        $request->validate(['status' => 'required|in:Applied,For Interview,For Requirements,Hired,Rejected']);
+        DB::table('applicants')->where('id', $id)->update(['status' => $request->status, 'updated_at' => now()]);
+
+        $acct = DB::table('users')->where('applicant_id', $id)->first();
+        if ($acct) {
+            Notify::send($acct->id, 'Your application status is now: ' . $request->status, '/apply');
+        }
+        return redirect('/applicants/' . $id)->with('success', 'Status updated.');
+    })->middleware('role:Admin,HR');
+
+    Route::post('/applicants/{id}/account', function (Request $request, $id) {
+        $applicant = DB::table('applicants')->where('id', $id)->first();
+        abort_if(! $applicant, 404);
+        $existing = DB::table('users')->where('applicant_id', $id)->first();
+        $request->validate([
+            'email' => 'required|email|unique:users,email' . ($existing ? ',' . $existing->id : ''),
+            'temp_password' => 'required|string|min:6',
+        ], [], ['email' => 'email address']);
+
+        if ($existing) {
+            User::where('id', $existing->id)->update([
+                'email' => $request->email,
+                'password' => Hash::make($request->temp_password),
+                'must_change_password' => true,
+            ]);
+        } else {
+            User::create([
+                'name' => $applicant->name, 'email' => $request->email, 'role' => 'Applicant',
+                'applicant_id' => $id, 'password' => Hash::make($request->temp_password), 'must_change_password' => true,
+            ]);
+        }
+        return redirect('/applicants/' . $id)->with('success', 'Temporary login ready.');
+    })->middleware('role:Admin,HR');
+
+    Route::post('/applicants/{id}/interviews', function (Request $request, $id) {
+        abort_if(! DB::table('applicants')->where('id', $id)->exists(), 404);
+        $request->validate([
+            'scheduled_at' => 'required|date',
+            'mode' => 'required|in:Onsite,Online,Phone',
+            'location' => 'nullable|string|max:255',
+            'interviewer' => 'nullable|string|max:255',
+            'notes' => 'nullable|string',
+        ]);
+
+        DB::table('interviews')->insert([
+            'applicant_id' => $id,
+            'scheduled_at' => $request->scheduled_at,
+            'mode' => $request->mode,
+            'location' => $request->location,
+            'interviewer' => $request->interviewer,
+            'notes' => $request->notes,
+            'status' => 'Scheduled',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('applicants')->where('id', $id)->update(['status' => 'For Interview', 'updated_at' => now()]);
+
+        $acct = DB::table('users')->where('applicant_id', $id)->first();
+        if ($acct) {
+            Notify::send($acct->id, 'An interview has been scheduled for ' . Carbon::parse($request->scheduled_at)->format('M d, Y h:i A') . ' (' . $request->mode . ').', '/apply/interviews');
+        }
+        Audit::log('interview.schedule', Auth::user()->name . ' scheduled an interview');
+        return redirect('/applicants/' . $id)->with('success', 'Interview scheduled.');
+    })->middleware('role:Admin,HR');
+
+    Route::delete('/interviews/{id}', function ($id) {
+        DB::table('interviews')->where('id', $id)->delete();
+        return back()->with('success', 'Interview removed.');
+    })->middleware('role:Admin,HR');
+
+    Route::get('/applicant-documents/{id}/download', function ($id) {
+        $doc = DB::table('applicant_documents')->where('id', $id)->first();
+        abort_if(! $doc || ! Storage::disk('local')->exists($doc->file_path), 404);
+        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+    })->middleware('role:Admin,HR');
+
+    // Convert a hired applicant into a permanent employee (carries the login over).
+    Route::post('/applicants/{id}/convert', function (Request $request, $id) {
+        $applicant = DB::table('applicants')->where('id', $id)->first();
+        abort_if(! $applicant, 404);
+
+        $request->validate([
+            'employee_id' => 'required|string|max:255|unique:employees,employee_id',
+            'department' => 'required|string|max:255',
+            'position' => 'required|string|max:255',
+            'date_hired' => 'required|date',
+            'employment_type' => 'nullable|string|max:255',
+        ]);
+
+        $employeeId = DB::table('employees')->insertGetId([
+            'name' => $applicant->name,
+            'email' => $applicant->email,
+            'contact_number' => $applicant->phone,
+            'employee_id' => $request->employee_id,
+            'department' => $request->department,
+            'position' => $request->position,
+            'date_hired' => $request->date_hired,
+            'employment_type' => $request->employment_type ?: 'Probationary',
+            'status' => 'Active',
+            'vacation_credits' => (int) Setting::get('default_vacation_credits', 15),
+            'sick_credits' => (int) Setting::get('default_sick_credits', 15),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Carry over submitted documents into the 201 file.
+        foreach (DB::table('applicant_documents')->where('applicant_id', $id)->get() as $doc) {
+            DB::table('employee_documents')->insert([
+                'employee_id' => $employeeId,
+                'name' => $doc->name,
+                'category' => $doc->category,
+                'file_path' => $doc->file_path,
+                'original_name' => $doc->original_name,
+                'uploaded_by' => $doc->uploaded_by,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Promote the temporary account to a permanent employee login.
+        $acct = DB::table('users')->where('applicant_id', $id)->first();
+        if ($acct) {
+            DB::table('users')->where('id', $acct->id)->update([
+                'role' => 'Employee',
+                'employee_id' => $employeeId,
+                'applicant_id' => null,
+                'updated_at' => now(),
+            ]);
+            Notify::send($acct->id, 'Congratulations! Your account is now a regular employee account.', '/portal');
+        }
+
+        DB::table('applicants')->where('id', $id)->update(['status' => 'Hired', 'updated_at' => now()]);
+        Audit::log('applicant.convert', Auth::user()->name . ' hired applicant ' . $applicant->name);
+
+        return redirect('/employees/' . $employeeId)->with('success', 'Applicant hired and converted to a permanent employee.');
     })->middleware('role:Admin,HR');
 
     /*

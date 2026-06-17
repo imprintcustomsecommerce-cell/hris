@@ -17,9 +17,9 @@ class EnsurePasswordChanged
         $user = $request->user();
 
         if ($user && $user->must_change_password
-            && ! $request->is('portal/password')
+            && ! $request->is('account/password')
             && ! $request->is('logout')) {
-            return redirect('/portal/password');
+            return redirect('/account/password');
         }
 
         return $next($request);
