@@ -76,6 +76,7 @@ Route::middleware('guest')->group(function () {
                 'Employee' => '/portal',
                 'Manager' => '/tasks',
                 'Applicant' => '/apply',
+                'CEO' => '/projects',
                 default => '/dashboard',
             });
         }
@@ -150,6 +151,7 @@ Route::get('/', function () {
         'Employee' => '/portal',
         'Manager' => '/tasks',
         'Applicant' => '/apply',
+        'CEO' => '/projects',
         default => '/dashboard',
     });
 });
@@ -180,6 +182,7 @@ Route::middleware('auth')->group(function () {
             'Employee' => '/portal',
             'Manager' => '/tasks',
             'Applicant' => '/apply',
+            'CEO' => '/projects',
             default => '/dashboard',
         };
 
@@ -417,6 +420,168 @@ Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
 
         return view('team.index', ['members' => $query->orderBy('employees.name')->get()]);
     });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Projects — CEO assigns to a Manager; Manager breaks into team tasks
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:Admin,CEO,Manager'])->group(function () {
+
+    $canManageProject = function ($project) {
+        // CEO/Admin manage all; a Manager manages only their assigned projects.
+        return in_array(Auth::user()->role, ['Admin', 'CEO'], true) || $project->manager_id === Auth::id();
+    };
+
+    Route::get('/projects', function () {
+        $isExec = in_array(Auth::user()->role, ['Admin', 'CEO'], true);
+
+        $projects = DB::table('projects')
+            ->leftJoin('users', 'projects.manager_id', '=', 'users.id')
+            ->select('projects.*', 'users.name as manager_name')
+            ->when(! $isExec, fn ($q) => $q->where('projects.manager_id', Auth::id()))
+            ->orderBy('projects.id', 'desc')
+            ->get();
+
+        // Per-project task progress.
+        $progress = DB::table('tasks')
+            ->select('project_id', DB::raw('COUNT(*) as total'), DB::raw("SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as done"))
+            ->whereNotNull('project_id')
+            ->groupBy('project_id')
+            ->get()->keyBy('project_id');
+
+        return view('projects.index', [
+            'projects' => $projects,
+            'progress' => $progress,
+            'isExec' => $isExec,
+            'managers' => DB::table('users')->where('role', 'Manager')->orderBy('name')->get(),
+        ]);
+    });
+
+    Route::post('/projects', function (Request $request) {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'manager_id' => 'required|exists:users,id',
+            'deadline' => 'nullable|date',
+        ]);
+
+        $id = DB::table('projects')->insertGetId([
+            'title' => $request->title,
+            'description' => $request->description,
+            'manager_id' => $request->manager_id,
+            'created_by' => Auth::id(),
+            'creator_name' => Auth::user()->name,
+            'deadline' => $request->deadline,
+            'status' => 'Pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Notify::send((int) $request->manager_id, Auth::user()->name . ' assigned you a project: "' . $request->title . '"', '/projects/' . $id);
+        Audit::log('project.create', Auth::user()->name . ' created project "' . $request->title . '"');
+
+        return redirect('/projects/' . $id)->with('success', 'Project created and assigned.');
+    })->middleware('role:Admin,CEO');
+
+    Route::get('/projects/{id}', function ($id) use ($canManageProject) {
+        $project = DB::table('projects')
+            ->leftJoin('users', 'projects.manager_id', '=', 'users.id')
+            ->select('projects.*', 'users.name as manager_name')
+            ->where('projects.id', $id)->first();
+        abort_if(! $project, 404);
+        abort_if(! $canManageProject($project), 403);
+
+        $tasks = DB::table('tasks')
+            ->join('employees', 'tasks.assigned_to', '=', 'employees.id')
+            ->select('tasks.*', 'employees.name as employee_name')
+            ->where('tasks.project_id', $id)->orderBy('tasks.id', 'desc')->get();
+
+        // Employees the current manager (or exec) may assign to.
+        $managerEmpId = DB::table('users')->where('id', $project->manager_id)->value('employee_id');
+        $team = DB::table('employees')->where('status', 'Active')
+            ->when($managerEmpId, fn ($q) => $q->where(fn ($w) => $w->where('manager_id', $managerEmpId)->orWhere('id', $managerEmpId)))
+            ->orderBy('name')->get();
+
+        return view('projects.show', [
+            'project' => $project,
+            'tasks' => $tasks,
+            'team' => $team,
+            'doneCount' => $tasks->where('status', 'Completed')->count(),
+            'canManage' => $canManageProject($project),
+        ]);
+    });
+
+    Route::post('/projects/{id}/tasks', function (Request $request, $id) use ($canManageProject) {
+        $project = DB::table('projects')->where('id', $id)->first();
+        abort_if(! $project, 404);
+        abort_if(! $canManageProject($project), 403);
+
+        $request->validate([
+            'assigned_to' => 'required|exists:employees,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'required|in:Low,Medium,High',
+            'due_date' => 'nullable|date',
+        ]);
+
+        DB::table('tasks')->insert([
+            'project_id' => $id,
+            'title' => $request->title,
+            'description' => $request->description,
+            'assigned_to' => $request->assigned_to,
+            'assigned_by' => Auth::id(),
+            'priority' => $request->priority,
+            'due_date' => $request->due_date,
+            'status' => 'Pending',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Project moves to In Progress once it has tasks.
+        if ($project->status === 'Pending') {
+            DB::table('projects')->where('id', $id)->update(['status' => 'In Progress', 'updated_at' => now()]);
+        }
+
+        $recipient = DB::table('users')->where('employee_id', $request->assigned_to)->first();
+        if ($recipient) {
+            Notify::send($recipient->id, Auth::user()->name . ' assigned you a task on "' . $project->title . '": ' . $request->title, '/portal/tasks');
+        }
+
+        return redirect('/projects/' . $id)->with('success', 'Task added to project.');
+    });
+
+    Route::patch('/projects/{id}/complete', function ($id) use ($canManageProject) {
+        $project = DB::table('projects')->where('id', $id)->first();
+        abort_if(! $project, 404);
+        abort_if(! $canManageProject($project), 403);
+
+        $total = DB::table('tasks')->where('project_id', $id)->count();
+        $open = DB::table('tasks')->where('project_id', $id)->where('status', '!=', 'Completed')->count();
+
+        if ($total === 0) {
+            return back()->with('success', 'Add at least one task before completing the project.');
+        }
+        if ($open > 0) {
+            return back()->with('success', "Cannot complete: {$open} task(s) still unfinished.");
+        }
+
+        DB::table('projects')->where('id', $id)->update(['status' => 'Completed', 'updated_at' => now()]);
+
+        if ($project->created_by) {
+            Notify::send($project->created_by, 'Project "' . $project->title . '" has been completed.', '/projects/' . $id);
+        }
+        Audit::log('project.complete', Auth::user()->name . ' completed project "' . $project->title . '"');
+
+        return redirect('/projects/' . $id)->with('success', 'Project marked as completed.');
+    });
+
+    Route::delete('/projects/{id}', function ($id) {
+        DB::table('tasks')->where('project_id', $id)->update(['project_id' => null]);
+        DB::table('projects')->where('id', $id)->delete();
+        return redirect('/projects')->with('success', 'Project deleted.');
+    })->middleware('role:Admin,CEO');
 });
 
 /*

@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         // HRIS system accounts
         $accounts = [
             ['name' => 'System Administrator', 'email' => 'admin@imprintcustoms.ph', 'role' => 'Admin'],
+            ['name' => 'Chief Executive Officer', 'email' => 'ceo@imprintcustoms.ph', 'role' => 'CEO'],
             ['name' => 'HR Officer', 'email' => 'hr@imprintcustoms.ph', 'role' => 'HR'],
             ['name' => 'Department Manager', 'email' => 'manager@imprintcustoms.ph', 'role' => 'Manager'],
             ['name' => 'Employee Portal', 'email' => 'employee@imprintcustoms.ph', 'role' => 'Employee'],
