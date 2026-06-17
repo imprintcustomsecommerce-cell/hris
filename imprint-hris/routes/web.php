@@ -366,6 +366,8 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             $data['balances'] = LeaveBalance::summary($me);
         }
 
+        $data['announcements'] = DB::table('announcements')->orderBy('id', 'desc')->limit(3)->get();
+
         return view('portal.dashboard', $data);
     });
 
@@ -509,6 +511,25 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         return $pdf->download('payslip-' . $payroll->payroll_month . $payroll->payroll_year . '.pdf');
     });
 
+    // My documents (read-only)
+    Route::get('/documents', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $documents = $me
+            ? DB::table('employee_documents')->where('employee_id', $me->id)->orderBy('id', 'desc')->get()
+            : collect();
+        return view('portal.documents', ['me' => $me, 'documents' => $documents]);
+    });
+
+    Route::get('/documents/{id}/download', function ($id) {
+        $doc = DB::table('employee_documents')
+            ->where('id', $id)
+            ->where('employee_id', Auth::user()->employee_id) // ownership check
+            ->first();
+        abort_if(! $doc, 404);
+        abort_if(! Storage::disk('local')->exists($doc->file_path), 404);
+        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+    });
+
     Route::get('/tasks', function () use ($myEmployee) {
         $me = $myEmployee();
         $tasks = $me
@@ -594,6 +615,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'headcountByDept' => $headcountByDept,
             'leaveByStatus' => $leaveByStatus,
             'upcomingHolidays' => DB::table('holidays')->whereDate('date', '>=', $today)->orderBy('date')->limit(4)->get(),
+            'announcements' => DB::table('announcements')->orderBy('id', 'desc')->limit(3)->get(),
         ]);
     });
 
@@ -785,8 +807,51 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'account' => $account,
             'balances' => LeaveBalance::summary($employee),
             'manager' => $employee->manager_id ? DB::table('employees')->where('id', $employee->manager_id)->first() : null,
+            'documents' => DB::table('employee_documents')->where('employee_id', $id)->orderBy('id', 'desc')->get(),
         ]);
     });
+
+    // Employee documents (201 file)
+    Route::post('/employees/{id}/documents', function (Request $request, $id) {
+        abort_if(! DB::table('employees')->where('id', $id)->exists(), 404);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'category' => 'required|string|max:255',
+            'document' => 'required|file|max:10240', // 10MB
+        ]);
+
+        $path = $request->file('document')->store('documents'); // private (storage/app)
+
+        DB::table('employee_documents')->insert([
+            'employee_id' => $id,
+            'name' => $request->name,
+            'category' => $request->category,
+            'file_path' => $path,
+            'original_name' => $request->file('document')->getClientOriginalName(),
+            'uploaded_by' => Auth::id(),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Audit::log('document.upload', Auth::user()->name . ' uploaded a document for employee #' . $id);
+        return redirect('/employees/' . $id)->with('success', 'Document uploaded.');
+    })->middleware('role:Admin,HR');
+
+    Route::get('/documents/{id}/download', function ($id) {
+        $doc = DB::table('employee_documents')->where('id', $id)->first();
+        abort_if(! $doc, 404);
+        abort_if(! Storage::disk('local')->exists($doc->file_path), 404);
+        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+    })->middleware('role:Admin,HR');
+
+    Route::delete('/documents/{id}', function ($id) {
+        $doc = DB::table('employee_documents')->where('id', $id)->first();
+        abort_if(! $doc, 404);
+        Storage::disk('local')->delete($doc->file_path);
+        DB::table('employee_documents')->where('id', $id)->delete();
+        Audit::log('document.delete', Auth::user()->name . ' deleted a document');
+        return redirect('/employees/' . $doc->employee_id)->with('success', 'Document removed.');
+    })->middleware('role:Admin,HR');
 
     // Create or reset a portal login account for an employee.
     Route::post('/employees/{id}/account', function (Request $request, $id) {
@@ -1382,6 +1447,52 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         DB::table('holidays')->where('id', $id)->delete();
         return redirect('/holidays')->with('success', 'Holiday removed.');
     });
+
+    /*
+    | Announcements
+    */
+    Route::get('/announcements', function () {
+        return view('announcements.index', [
+            'announcements' => DB::table('announcements')->orderBy('id', 'desc')->get(),
+        ]);
+    });
+
+    Route::post('/announcements', function (Request $request) {
+        $request->validate([
+            'title' => 'required|string|max:255',
+            'body' => 'required|string',
+        ]);
+
+        DB::table('announcements')->insert([
+            'title' => $request->title,
+            'body' => $request->body,
+            'posted_by' => Auth::id(),
+            'author_name' => Auth::user()->name,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Bell-notify everyone (no email blast).
+        $userIds = DB::table('users')->pluck('id');
+        $rows = $userIds->map(fn ($uid) => [
+            'user_id' => $uid,
+            'message' => 'New announcement: ' . $request->title,
+            'url' => '/announcements',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ])->all();
+        if ($rows) {
+            DB::table('notifications')->insert($rows);
+        }
+
+        Audit::log('announcement.create', Auth::user()->name . ' posted "' . $request->title . '"');
+        return redirect('/announcements')->with('success', 'Announcement posted.');
+    })->middleware('role:Admin,HR');
+
+    Route::delete('/announcements/{id}', function ($id) {
+        DB::table('announcements')->where('id', $id)->delete();
+        return redirect('/announcements')->with('success', 'Announcement removed.');
+    })->middleware('role:Admin,HR');
 
     /*
     | Audit log (Admin only)

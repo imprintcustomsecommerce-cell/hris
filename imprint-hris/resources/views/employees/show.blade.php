@@ -144,5 +144,51 @@
                 </form>
             </div>
         </div>
+
+        <div class="card" style="margin-top:18px;">
+            <div class="card-head"><h2>Documents (201 File)</h2></div>
+            <div class="card-body" style="padding:8px 24px 20px;">
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Name</th><th>Category</th><th>Uploaded</th><th></th></tr></thead>
+                        <tbody>
+                            @forelse($documents as $doc)
+                                <tr>
+                                    <td><strong style="color:var(--text);">{{ $doc->name }}</strong></td>
+                                    <td><span class="badge gray">{{ $doc->category }}</span></td>
+                                    <td>{{ \Carbon\Carbon::parse($doc->created_at)->format('M d, Y') }}</td>
+                                    <td>
+                                        <div class="actions">
+                                            <a href="/documents/{{ $doc->id }}/download" class="btn btn-ghost btn-sm">Download</a>
+                                            <form action="/documents/{{ $doc->id }}" method="POST" onsubmit="return confirm('Delete this document?')" style="margin:0;">
+                                                @csrf @method('DELETE')
+                                                <button class="btn btn-danger btn-sm" type="submit">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4"><p class="muted">No documents uploaded.</p></td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+
+                <form action="/employees/{{ $employee->id }}/documents" method="POST" enctype="multipart/form-data" class="form-grid" style="align-items:end; margin-top:18px;">
+                    @csrf
+                    <div class="field"><label>Document Name</label><input type="text" name="name" placeholder="e.g. Employment Contract" required></div>
+                    <div class="field">
+                        <label>Category</label>
+                        <select name="category" required>
+                            @foreach(['General','Contract','Government ID','Resume','Certificate','Medical','Disciplinary'] as $c)
+                                <option value="{{ $c }}">{{ $c }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="field"><label>File</label><input type="file" name="document" required></div>
+                    <div class="field full"><button type="submit" class="btn btn-primary">Upload Document</button></div>
+                </form>
+            </div>
+        </div>
     @endif
 @endsection

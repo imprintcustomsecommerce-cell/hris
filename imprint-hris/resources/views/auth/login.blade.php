@@ -76,8 +76,8 @@
         padding: 56px; display: flex; align-items: center;
     }
     .aside-inner { position: relative; z-index: 2; max-width: 420px; }
-    .aside-logo { width: 60px; height: 60px; border-radius: 16px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 30px; }
-    .aside-logo img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+    .aside-logo { width: 180px; height: 180px; border-radius: 32px; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: 34px; }
+    .aside-logo img { width: 100%; height: 100%; object-fit: contain; padding: 16px; }
     .auth-aside h2 { font-size: 34px; line-height: 1.15; letter-spacing: -.03em; margin: 0 0 16px; }
     .auth-aside p { color: rgba(255,255,255,.8); font-size: 16px; line-height: 1.6; margin: 0 0 28px; }
     .aside-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }

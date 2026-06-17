@@ -106,4 +106,19 @@
             </div>
         </div>
     @endunless
+
+    <div class="card" style="margin-top:18px;">
+        <div class="card-head"><div><h2>Announcements</h2></div></div>
+        <div class="card-body" style="padding:8px 24px 16px;">
+            @forelse($announcements ?? [] as $a)
+                <div style="padding:14px 0; border-bottom:1px solid var(--border);">
+                    <strong style="font-size:15px;">{{ $a->title }}</strong>
+                    <p style="margin:5px 0 0; color:var(--muted); font-size:14px; line-height:1.6;">{{ $a->body }}</p>
+                    <span style="display:block; margin-top:6px; color:var(--muted); font-size:12px;">{{ $a->author_name ?? 'HR' }} · {{ \Carbon\Carbon::parse($a->created_at)->diffForHumans() }}</span>
+                </div>
+            @empty
+                <p class="muted">No announcements.</p>
+            @endforelse
+        </div>
+    </div>
 @endsection
