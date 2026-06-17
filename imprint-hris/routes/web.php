@@ -432,6 +432,42 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         return view('portal.profile', ['me' => $myEmployee()]);
     });
 
+    Route::get('/profile/edit', function () use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403, 'Your account is not linked to an employee record. Please contact HR.');
+        return view('portal.profile-edit', ['me' => $me]);
+    });
+
+    Route::put('/profile', function (Request $request) use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403);
+
+        $request->validate([
+            'contact_number' => 'nullable|string|max:255',
+            'birthdate' => 'nullable|date',
+            'address' => 'nullable|string',
+            'photo' => 'nullable|image|max:2048',
+        ]);
+
+        $update = [
+            'contact_number' => $request->contact_number,
+            'birthdate' => $request->birthdate,
+            'address' => $request->address,
+            'updated_at' => now(),
+        ];
+
+        if ($request->hasFile('photo')) {
+            if ($me->photo) {
+                Storage::disk('public')->delete($me->photo);
+            }
+            $update['photo'] = $request->file('photo')->store('photos', 'public');
+        }
+
+        DB::table('employees')->where('id', $me->id)->update($update);
+
+        return redirect('/portal/profile')->with('success', 'Your profile has been updated.');
+    });
+
     Route::get('/attendance', function () use ($myEmployee) {
         $me = $myEmployee();
         $records = $me

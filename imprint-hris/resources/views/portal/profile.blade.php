@@ -11,13 +11,18 @@
     @else
         <div class="page-head">
             <div class="profile-hero">
-                <div class="avatar">{{ strtoupper(substr($me->name ?? 'E', 0, 1)) }}</div>
+                @if($me->photo)
+                    <img class="avatar" src="{{ asset('storage/' . $me->photo) }}" alt="" style="object-fit:cover;">
+                @else
+                    <div class="avatar">{{ strtoupper(substr($me->name ?? 'E', 0, 1)) }}</div>
+                @endif
                 <div>
                     <h1>{{ $me->name }}</h1>
                     <p>{{ $me->position }} · {{ $me->department }}</p>
                 </div>
             </div>
             <div class="head-actions">
+                <a href="/portal/profile/edit" class="btn btn-primary">Edit Profile</a>
                 <a href="/portal/password" class="btn btn-ghost">🔒 Change Password</a>
             </div>
         </div>
