@@ -58,7 +58,7 @@
 </div>
 
 <style>
-    :root { --accent: #4f46e5; --accent-dark: #4338ca; --accent-soft: #eef2ff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; }
+    :root { --accent: #facc15; --accent-dark: #eab308; --accent-soft: #fef9c3; --text: #0a0a0a; --muted: #6b7280; --border: #e4e4e7; }
     * { box-sizing: border-box; }
     body { margin: 0; font-family: 'Inter', system-ui, Arial, sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
 
@@ -66,7 +66,7 @@
 
     .auth-aside {
         position: relative; overflow: hidden; color: #fff;
-        background: linear-gradient(150deg, #1e1b4b, #4f46e5 70%, #6d28d9);
+        background: linear-gradient(150deg, #000000, #171717 70%, #0a0a0a);
         padding: 56px; display: flex; align-items: center;
     }
     .aside-inner { position: relative; z-index: 2; max-width: 420px; }
@@ -76,10 +76,10 @@
     .auth-aside p { color: rgba(255,255,255,.8); font-size: 16px; line-height: 1.6; margin: 0 0 28px; }
     .aside-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 14px; }
     .aside-list li { display: flex; align-items: center; gap: 11px; font-weight: 600; font-size: 15px; color: rgba(255,255,255,.92); }
-    .aside-list li::before { content: '✓'; width: 24px; height: 24px; flex-shrink: 0; background: rgba(255,255,255,.2); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
-    .orb { position: absolute; border-radius: 50%; filter: blur(8px); opacity: .35; }
-    .orb-1 { width: 340px; height: 340px; background: #a78bfa; top: -90px; right: -90px; }
-    .orb-2 { width: 260px; height: 260px; background: #818cf8; bottom: -80px; left: -60px; }
+    .aside-list li::before { content: '✓'; width: 24px; height: 24px; flex-shrink: 0; background: #facc15; color: #1a1a1a; font-weight: 800; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(8px); opacity: .15; }
+    .orb-1 { width: 340px; height: 340px; background: #facc15; top: -90px; right: -90px; }
+    .orb-2 { width: 260px; height: 260px; background: #3f3f46; bottom: -80px; left: -60px; }
 
     .auth-main { display: flex; align-items: center; justify-content: center; padding: 40px; background: #f1f5f9; }
     .auth-card { width: 100%; max-width: 400px; }
@@ -99,9 +99,9 @@
     .remember { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 22px; }
 
     .submit {
-        width: 100%; border: none; background: var(--accent); color: #fff; padding: 14px; border-radius: 12px;
-        font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;
-        box-shadow: 0 10px 24px rgba(79,70,229,.3); transition: .15s ease;
+        width: 100%; border: none; background: var(--accent); color: #1a1a1a; padding: 14px; border-radius: 12px;
+        font-size: 15px; font-weight: 800; cursor: pointer; font-family: inherit;
+        box-shadow: 0 10px 24px rgba(250,204,21,.35); transition: .15s ease;
     }
     .submit:hover { background: var(--accent-dark); }
 
