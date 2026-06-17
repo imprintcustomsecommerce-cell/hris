@@ -586,6 +586,108 @@ Route::middleware(['auth', 'role:Admin,CEO,Manager'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
+| Performance Reviews (HR / Admin / Manager)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
+
+    // Employees the reviewer may appraise (managers limited to their team).
+    $reviewable = function () {
+        $q = DB::table('employees')->where('status', 'Active')->orderBy('name');
+        if (Auth::user()->role === 'Manager') {
+            $q->where('manager_id', Auth::user()->employee_id);
+        }
+        return $q->get();
+    };
+
+    Route::get('/reviews', function () use ($reviewable) {
+        $ids = $reviewable()->pluck('id')->all();
+        $isManager = Auth::user()->role === 'Manager';
+
+        $reviews = DB::table('performance_reviews')
+            ->join('employees', 'performance_reviews.employee_id', '=', 'employees.id')
+            ->select('performance_reviews.*', 'employees.name as employee_name', 'employees.position')
+            ->when($isManager, fn ($q) => $q->where(function ($w) use ($ids) {
+                $w->where('performance_reviews.reviewer_id', Auth::id());
+                if ($ids) $w->orWhereIn('performance_reviews.employee_id', $ids);
+            }))
+            ->orderBy('performance_reviews.id', 'desc')
+            ->get();
+
+        return view('reviews.index', ['reviews' => $reviews, 'employees' => $reviewable()]);
+    });
+
+    Route::post('/reviews', function (Request $request) use ($reviewable) {
+        $request->validate([
+            'employee_id' => 'required|exists:employees,id',
+            'period' => 'required|string|max:255',
+            'rating_quality' => 'required|integer|min:1|max:5',
+            'rating_productivity' => 'required|integer|min:1|max:5',
+            'rating_teamwork' => 'required|integer|min:1|max:5',
+            'rating_punctuality' => 'required|integer|min:1|max:5',
+            'strengths' => 'nullable|string',
+            'improvements' => 'nullable|string',
+            'comments' => 'nullable|string',
+        ]);
+
+        if (! $reviewable()->pluck('id')->contains((int) $request->employee_id)) {
+            abort(403, 'You can only review your team members.');
+        }
+
+        $id = DB::table('performance_reviews')->insertGetId([
+            'employee_id' => $request->employee_id,
+            'reviewer_id' => Auth::id(),
+            'reviewer_name' => Auth::user()->name,
+            'period' => $request->period,
+            'rating_quality' => $request->rating_quality,
+            'rating_productivity' => $request->rating_productivity,
+            'rating_teamwork' => $request->rating_teamwork,
+            'rating_punctuality' => $request->rating_punctuality,
+            'strengths' => $request->strengths,
+            'improvements' => $request->improvements,
+            'comments' => $request->comments,
+            'status' => 'Draft',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Audit::log('review.create', Auth::user()->name . ' drafted a performance review');
+        return redirect('/reviews/' . $id)->with('success', 'Review saved as draft.');
+    });
+
+    Route::get('/reviews/{id}', function ($id) use ($reviewable) {
+        $review = DB::table('performance_reviews')
+            ->join('employees', 'performance_reviews.employee_id', '=', 'employees.id')
+            ->select('performance_reviews.*', 'employees.name as employee_name', 'employees.position', 'employees.department')
+            ->where('performance_reviews.id', $id)->first();
+        abort_if(! $review, 404);
+        if (Auth::user()->role === 'Manager' && ! $reviewable()->pluck('id')->contains($review->employee_id) && $review->reviewer_id !== Auth::id()) {
+            abort(403);
+        }
+        return view('reviews.show', ['review' => $review]);
+    });
+
+    Route::patch('/reviews/{id}/finalize', function ($id) {
+        $review = DB::table('performance_reviews')->where('id', $id)->first();
+        abort_if(! $review, 404);
+        DB::table('performance_reviews')->where('id', $id)->update(['status' => 'Finalized', 'updated_at' => now()]);
+
+        $acct = DB::table('users')->where('employee_id', $review->employee_id)->first();
+        if ($acct) {
+            Notify::send($acct->id, 'Your performance review for ' . $review->period . ' is now available.', '/portal/reviews');
+        }
+        Audit::log('review.finalize', Auth::user()->name . ' finalized a performance review');
+        return redirect('/reviews/' . $id)->with('success', 'Review finalized and shared with the employee.');
+    });
+
+    Route::delete('/reviews/{id}', function ($id) {
+        DB::table('performance_reviews')->where('id', $id)->delete();
+        return redirect('/reviews')->with('success', 'Review deleted.');
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
 | Employee Self-Service Portal
 |--------------------------------------------------------------------------
 */
@@ -842,6 +944,25 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         abort_if(! $doc, 404);
         abort_if(! Storage::disk('local')->exists($doc->file_path), 404);
         return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+    });
+
+    // My performance reviews (finalized only)
+    Route::get('/reviews', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $reviews = $me
+            ? DB::table('performance_reviews')->where('employee_id', $me->id)->where('status', 'Finalized')->orderBy('id', 'desc')->get()
+            : collect();
+        return view('portal.reviews', ['me' => $me, 'reviews' => $reviews]);
+    });
+
+    Route::get('/reviews/{id}', function ($id) {
+        $review = DB::table('performance_reviews')
+            ->where('id', $id)
+            ->where('employee_id', Auth::user()->employee_id) // ownership
+            ->where('status', 'Finalized')
+            ->first();
+        abort_if(! $review, 404);
+        return view('portal.review-show', ['review' => $review]);
     });
 
     Route::get('/tasks', function () use ($myEmployee) {

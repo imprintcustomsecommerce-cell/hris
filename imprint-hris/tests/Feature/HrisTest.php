@@ -132,6 +132,31 @@ class HrisTest extends TestCase
         $this->assertSame('Completed', DB::table('projects')->where('id', $projectId)->value('status'));
     }
 
+    public function test_performance_review_visible_to_employee_only_when_finalized(): void
+    {
+        $manager = $this->user('manager@imprintcustoms.ph');
+        $employeeRecordId = DB::table('employees')->where('employee_id', 'EMP-0001')->value('id');
+
+        $this->actingAs($manager)->post('/reviews', [
+            'employee_id' => $employeeRecordId,
+            'period' => '2026 H1',
+            'rating_quality' => 4,
+            'rating_productivity' => 5,
+            'rating_teamwork' => 4,
+            'rating_punctuality' => 3,
+        ])->assertRedirect();
+        $reviewId = DB::table('performance_reviews')->where('period', '2026 H1')->value('id');
+
+        // Draft: employee cannot see it.
+        $this->actingAs($this->user('employee@imprintcustoms.ph'))
+            ->get("/portal/reviews/{$reviewId}")->assertNotFound();
+
+        // Finalize, then the employee can view it.
+        $this->actingAs($manager)->patch("/reviews/{$reviewId}/finalize");
+        $this->actingAs($this->user('employee@imprintcustoms.ph'))
+            ->get("/portal/reviews/{$reviewId}")->assertOk();
+    }
+
     public function test_workdays_excludes_weekends(): void
     {
         // 2026-06-15 (Mon) .. 2026-06-19 (Fri) = 5 weekdays.
