@@ -11,6 +11,18 @@
         </div>
     </div>
 
+    @if($me)
+        <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);">
+            @foreach($balances as $b)
+                <div class="stat">
+                    <div class="stat-label">{{ $b['type'] }} Remaining</div>
+                    <div class="stat-value">{{ $b['remaining'] }} <span style="font-size:15px;color:var(--muted);">/ {{ $b['allotted'] }} days</span></div>
+                    <div class="stat-sub">{{ $b['used'] }} used this year</div>
+                </div>
+            @endforeach
+        </div>
+    @endif
+
     <div class="grid-2 lean">
         <div class="card">
             <div class="card-head"><h2>My Requests</h2></div>

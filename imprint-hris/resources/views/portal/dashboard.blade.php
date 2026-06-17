@@ -43,6 +43,32 @@
             </a>
         </div>
 
+        <div class="grid-2 lean" style="margin-bottom:18px;">
+            <div class="card">
+                <div class="card-head"><div><h2>Time Clock</h2><p>{{ now()->format('l, F d, Y') }}</p></div></div>
+                <div class="card-body" style="padding:22px 24px 24px;">
+                    <div style="display:flex; gap:20px; flex-wrap:wrap; margin-bottom:18px;">
+                        <div><div style="color:var(--muted);font-size:12px;font-weight:700;">Time In</div><div style="font-size:20px;font-weight:800;">{{ $today && $today->time_in ? date('h:i A', strtotime($today->time_in)) : '—' }}</div></div>
+                        <div><div style="color:var(--muted);font-size:12px;font-weight:700;">Time Out</div><div style="font-size:20px;font-weight:800;">{{ $today && $today->time_out ? date('h:i A', strtotime($today->time_out)) : '—' }}</div></div>
+                        <div><div style="color:var(--muted);font-size:12px;font-weight:700;">Status</div><div style="font-size:20px;font-weight:800;">{{ $today->status ?? 'Not clocked in' }}</div></div>
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <form action="/portal/clock-in" method="POST" style="flex:1;">@csrf<button class="btn btn-primary" style="width:100%;" {{ $today && $today->time_in ? 'disabled' : '' }}>Clock In</button></form>
+                        <form action="/portal/clock-out" method="POST" style="flex:1;">@csrf<button class="btn btn-ghost" style="width:100%;" {{ !($today && $today->time_in) || ($today && $today->time_out) ? 'disabled' : '' }}>Clock Out</button></form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-head"><div><h2>Leave Balances</h2><p>{{ now()->format('Y') }}</p></div></div>
+                <div class="card-body">
+                    @foreach($balances as $b)
+                        <div class="info-row"><span class="k">{{ $b['type'] }}</span><span class="v">{{ $b['remaining'] }} / {{ $b['allotted'] }} days</span></div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+
         <div class="grid-2 lean">
             <div class="card">
                 <div class="card-head">

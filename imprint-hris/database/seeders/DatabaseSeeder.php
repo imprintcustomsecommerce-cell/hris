@@ -73,8 +73,45 @@ class DatabaseSeeder extends Seeder
 
         $employeeId = DB::table('employees')->where('employee_id', 'EMP-0001')->value('id');
 
-        // Link the Employee account to its record.
+        // Manager employee record (so the Manager account has a team).
+        DB::table('employees')->updateOrInsert(
+            ['employee_id' => 'EMP-MGR1'],
+            [
+                'name' => 'Department Manager',
+                'email' => 'manager@imprintcustoms.ph',
+                'department' => 'Production',
+                'position' => 'Production Manager',
+                'date_hired' => '2023-01-10',
+                'employment_type' => 'Regular',
+                'status' => 'Active',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]
+        );
+        $managerEmployeeId = DB::table('employees')->where('employee_id', 'EMP-MGR1')->value('id');
+
+        // Link accounts to their employee records.
         User::where('email', 'employee@imprintcustoms.ph')->update(['employee_id' => $employeeId]);
+        User::where('email', 'manager@imprintcustoms.ph')->update(['employee_id' => $managerEmployeeId]);
+
+        // Put the demo employee on the manager's team.
+        DB::table('employees')->where('id', $employeeId)->update(['manager_id' => $managerEmployeeId]);
+
+        // Philippine holidays (sample).
+        foreach ([
+            ['name' => 'New Year\'s Day', 'date' => now()->format('Y') . '-01-01', 'type' => 'Regular'],
+            ['name' => 'Araw ng Kagitingan', 'date' => now()->format('Y') . '-04-09', 'type' => 'Regular'],
+            ['name' => 'Labor Day', 'date' => now()->format('Y') . '-05-01', 'type' => 'Regular'],
+            ['name' => 'Independence Day', 'date' => now()->format('Y') . '-06-12', 'type' => 'Regular'],
+            ['name' => 'Bonifacio Day', 'date' => now()->format('Y') . '-11-30', 'type' => 'Regular'],
+            ['name' => 'Christmas Day', 'date' => now()->format('Y') . '-12-25', 'type' => 'Regular'],
+            ['name' => 'Rizal Day', 'date' => now()->format('Y') . '-12-30', 'type' => 'Regular'],
+        ] as $holiday) {
+            DB::table('holidays')->updateOrInsert(
+                ['date' => $holiday['date']],
+                ['name' => $holiday['name'], 'type' => $holiday['type'], 'created_at' => now(), 'updated_at' => now()]
+            );
+        }
 
         // Sample self-service data (only seed once).
         if ($employeeId && DB::table('attendances')->where('employee_id', $employeeId)->doesntExist()) {

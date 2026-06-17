@@ -9,6 +9,10 @@
             <h1>HR Reports</h1>
             <p>Overview of workforce, attendance, leave, and payroll.</p>
         </div>
+        <div class="head-actions">
+            <a href="/reports/export/employees" class="btn btn-ghost">⬇ Employees CSV</a>
+            <a href="/reports/export/payroll" class="btn btn-primary">⬇ Payroll CSV</a>
+        </div>
     </div>
 
     <div class="stat-grid">
@@ -21,9 +25,13 @@
     <div class="grid-2">
         <div class="card">
             <div class="card-head"><h2>Headcount by Department</h2></div>
-            <div class="card-body">
+            <div class="card-body" style="padding-bottom:20px;">
+                @php $maxHead = max(1, optional($headcountByDept->first())->total ?? 1); @endphp
                 @forelse($headcountByDept as $row)
-                    <div class="info-row"><span class="k">{{ $row->department ?? 'Unassigned' }}</span><span class="v">{{ $row->total }}</span></div>
+                    <div style="margin:12px 0;">
+                        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px;"><span>{{ $row->department ?? 'Unassigned' }}</span><span>{{ $row->total }}</span></div>
+                        <div style="height:8px;background:var(--accent-soft);border-radius:999px;overflow:hidden;"><div style="height:100%;width:{{ round($row->total / $maxHead * 100) }}%;background:var(--accent);border-radius:999px;"></div></div>
+                    </div>
                 @empty
                     <p class="muted">No data.</p>
                 @endforelse

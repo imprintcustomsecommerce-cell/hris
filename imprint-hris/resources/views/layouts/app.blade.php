@@ -7,6 +7,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+        // Apply saved theme before paint to avoid flash.
+        if (localStorage.getItem('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        function toggleTheme() {
+            const el = document.documentElement;
+            const dark = el.getAttribute('data-theme') === 'dark';
+            if (dark) { el.removeAttribute('data-theme'); localStorage.setItem('theme', 'light'); }
+            else { el.setAttribute('data-theme', 'dark'); localStorage.setItem('theme', 'dark'); }
+        }
+    </script>
 </head>
 <body>
 
@@ -26,11 +36,16 @@
             ['/payroll', 'Payroll', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
             $taskNav,
             ['/reports', 'Reports', 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z'],
+            ['/holidays', 'Holidays', 'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'],
         ];
+        if ($role === 'Admin') {
+            $nav[] = ['/audit', 'Audit Log', 'M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'];
+        }
         $home = '/dashboard';
     } elseif ($role === 'Manager') {
         $nav = [
             $taskNav,
+            ['/team', 'My Team', 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-1.13a4 4 0 1 0-4-4 4 4 0 0 0 4 4z'],
         ];
         $home = '/tasks';
     } else {
@@ -103,6 +118,10 @@
             </label>
             <div class="topbar-title">@yield('heading', 'Dashboard')</div>
             <div class="topbar-date">{{ now()->format('l, F d, Y') }}</div>
+            <button type="button" class="bell" id="theme-toggle" aria-label="Toggle theme" onclick="toggleTheme()">
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
             <a href="/notifications" class="bell" aria-label="Notifications">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
                 @if($unreadCount > 0)<span class="bell-dot">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>@endif
@@ -145,6 +164,25 @@
         --shadow: 0 1px 3px rgba(15,23,42,.06), 0 12px 32px rgba(15,23,42,.06);
         --sidebar-w: 264px;
     }
+
+    [data-theme="dark"] {
+        --bg: #0b1220;
+        --card: #131c2e;
+        --sidebar: #0a0f1c;
+        --sidebar-2: #1c2740;
+        --accent: #6366f1;
+        --accent-dark: #4f46e5;
+        --accent-soft: #1e213a;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #25304a;
+        --shadow: 0 1px 3px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
+    }
+
+    /* Theme toggle icon visibility */
+    .icon-moon { display: none; }
+    [data-theme="dark"] .icon-sun { display: none; }
+    [data-theme="dark"] .icon-moon { display: block; }
 
     * { box-sizing: border-box; }
 
@@ -220,7 +258,7 @@
         position: sticky; top: 0; z-index: 40;
         height: 70px; display: flex; align-items: center; gap: 16px;
         padding: 0 40px;
-        background: rgba(241,245,249,.8); backdrop-filter: blur(12px);
+        background: var(--card); backdrop-filter: blur(12px);
         border-bottom: 1px solid var(--border);
     }
     .topbar-title { font-size: 18px; font-weight: 800; letter-spacing: -.02em; }

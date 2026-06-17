@@ -82,4 +82,38 @@
             </div>
         </div>
     </div>
+
+    <div class="grid-2 lean" style="margin-top:18px;">
+        <div class="card">
+            <div class="card-head"><div><h2>Headcount by Department</h2></div><a href="/reports" class="btn btn-ghost btn-sm">Reports</a></div>
+            <div class="card-body" style="padding-bottom:20px;">
+                @php $maxHead = max(1, optional(($headcountByDept ?? collect())->first())->total ?? 1); @endphp
+                @forelse($headcountByDept ?? [] as $row)
+                    <div style="margin:12px 0;">
+                        <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:5px;"><span>{{ $row->department ?? 'Unassigned' }}</span><span>{{ $row->total }}</span></div>
+                        <div style="height:8px;background:var(--accent-soft);border-radius:999px;overflow:hidden;"><div style="height:100%;width:{{ round($row->total / $maxHead * 100) }}%;background:var(--accent);border-radius:999px;"></div></div>
+                    </div>
+                @empty
+                    <p class="muted">No data.</p>
+                @endforelse
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-head"><div><h2>Upcoming Holidays</h2></div><a href="/holidays" class="btn btn-ghost btn-sm">All</a></div>
+            <div class="card-body">
+                @forelse($upcomingHolidays ?? [] as $h)
+                    <div class="list-row">
+                        <div>
+                            <span class="lr-title">{{ $h->name }}</span>
+                            <span class="lr-sub">{{ date('l, M d, Y', strtotime($h->date)) }}</span>
+                        </div>
+                        <span class="badge {{ $h->type === 'Special' ? 'blue' : 'green' }}">{{ $h->type }}</span>
+                    </div>
+                @empty
+                    <p class="muted">No upcoming holidays.</p>
+                @endforelse
+            </div>
+        </div>
+    </div>
 @endsection

@@ -37,13 +37,20 @@
                                 </td>
                                 <td>{{ $task->employee_name }}</td>
                                 <td><span class="badge {{ $pc }}">{{ $task->priority }}</span></td>
-                                <td>{{ $task->due_date ? date('M d, Y', strtotime($task->due_date)) : '—' }}</td>
+                                @php $overdue = $task->due_date && $task->status !== 'Completed' && strtotime($task->due_date) < strtotime(date('Y-m-d')); @endphp
+                                <td>
+                                    {{ $task->due_date ? date('M d, Y', strtotime($task->due_date)) : '—' }}
+                                    @if($overdue)<br><span class="badge red">overdue</span>@endif
+                                </td>
                                 <td><span class="badge {{ $sc }}">{{ $task->status }}</span></td>
                                 <td>
-                                    <form action="/tasks/{{ $task->id }}" method="POST" onsubmit="return confirm('Delete this task?')">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                                    </form>
+                                    <div class="actions">
+                                        <a href="/tasks/{{ $task->id }}/edit" class="btn btn-ghost btn-sm">Edit</a>
+                                        <form action="/tasks/{{ $task->id }}" method="POST" onsubmit="return confirm('Delete this task?')">
+                                            @csrf @method('DELETE')
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                        </form>
+                                    </div>
                                 </td>
                             </tr>
                         @empty

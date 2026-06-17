@@ -16,7 +16,7 @@
 
     <div class="card">
         <div class="card-body" style="padding:28px;">
-            <form action="/employees" method="POST">
+            <form action="/employees" method="POST" enctype="multipart/form-data">
                 @csrf
 
                 <div class="form-section">
@@ -27,6 +27,7 @@
                         <div class="field"><label>Contact Number</label><input type="text" name="contact_number" value="{{ old('contact_number') }}" placeholder="09xx xxx xxxx"></div>
                         <div class="field"><label>Birthdate</label><input type="date" name="birthdate" value="{{ old('birthdate') }}"></div>
                         <div class="field full"><label>Address</label><textarea name="address" rows="3" placeholder="Complete address">{{ old('address') }}</textarea></div>
+                        <div class="field full"><label>Profile Photo</label><input type="file" name="photo" accept="image/*"></div>
                     </div>
                 </div>
 
@@ -61,6 +62,23 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="field">
+                            <label>Reports To (Manager)</label>
+                            <select name="manager_id">
+                                <option value="">— None —</option>
+                                @foreach(($managers ?? []) as $mgr)
+                                    <option value="{{ $mgr->id }}" {{ (int) old('manager_id') === (int) $mgr->id ? 'selected' : '' }}>{{ $mgr->name }} ({{ $mgr->position }})</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Leave Credits (annual)</h3>
+                    <div class="form-grid">
+                        <div class="field"><label>Vacation Leave days</label><input type="number" name="vacation_credits" value="{{ old('vacation_credits', 15) }}" min="0" max="365"></div>
+                        <div class="field"><label>Sick Leave days</label><input type="number" name="sick_credits" value="{{ old('sick_credits', 15) }}" min="0" max="365"></div>
                     </div>
                 </div>
 

@@ -11,6 +11,7 @@
         </div>
         @if(in_array(auth()->user()->role, ['Admin', 'HR']))
             <div class="head-actions">
+                <a href="/reports/export/employees" class="btn btn-ghost">⬇ Export CSV</a>
                 <a href="/employees/create" class="btn btn-primary">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
                     Add Employee
@@ -29,10 +30,10 @@
     <div class="card">
         <div class="card-head">
             <div><h2>Employee Directory</h2></div>
-            <div class="search">
+            <form class="search" method="GET" action="/employees">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-                <input type="text" id="emp-search" placeholder="Search employees...">
-            </div>
+                <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Search name, ID, dept..." onchange="this.form.submit()">
+            </form>
         </div>
         <div class="table-wrap">
             <table>
@@ -47,7 +48,11 @@
                         <tr>
                             <td>
                                 <div class="cell-user">
-                                    <div class="avatar">{{ strtoupper(substr($employee->name ?? 'E', 0, 1)) }}</div>
+                                    @if($employee->photo)
+                                        <img class="avatar" src="{{ asset('storage/' . $employee->photo) }}" alt="" style="object-fit:cover;">
+                                    @else
+                                        <div class="avatar">{{ strtoupper(substr($employee->name ?? 'E', 0, 1)) }}</div>
+                                    @endif
                                     <div>
                                         <strong>{{ $employee->name }}</strong>
                                         <span>{{ $employee->email ?? 'No email' }}</span>
@@ -85,13 +90,4 @@
         </div>
     </div>
 
-    <script>
-        const q = document.getElementById('emp-search');
-        if (q) q.addEventListener('input', e => {
-            const t = e.target.value.toLowerCase();
-            document.querySelectorAll('#emp-rows tr').forEach(r => {
-                r.style.display = r.textContent.toLowerCase().includes(t) ? '' : 'none';
-            });
-        });
-    </script>
 @endsection

@@ -6,7 +6,11 @@
 @section('content')
     <div class="page-head">
         <div class="profile-hero">
-            <div class="avatar">{{ strtoupper(substr($employee->name ?? 'E', 0, 1)) }}</div>
+            @if($employee->photo)
+                <img class="avatar" src="{{ asset('storage/' . $employee->photo) }}" alt="" style="object-fit:cover;">
+            @else
+                <div class="avatar">{{ strtoupper(substr($employee->name ?? 'E', 0, 1)) }}</div>
+            @endif
             <div>
                 <h1>{{ $employee->name }}</h1>
                 <p>{{ $employee->position }} · {{ $employee->department }}</p>
@@ -40,8 +44,21 @@
                 <div class="info-row"><span class="k">Position</span><span class="v">{{ $employee->position }}</span></div>
                 <div class="info-row"><span class="k">Date Hired</span><span class="v">{{ date('M d, Y', strtotime($employee->date_hired)) }}</span></div>
                 <div class="info-row"><span class="k">Type</span><span class="v">{{ $employee->employment_type ?? '—' }}</span></div>
+                <div class="info-row"><span class="k">Reports To</span><span class="v">{{ $manager->name ?? '—' }}</span></div>
                 <div class="info-row"><span class="k">Status</span><span class="v">{{ $employee->status }}</span></div>
             </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+        <div class="card-head"><h2>Leave Balances ({{ now()->format('Y') }})</h2></div>
+        <div class="card-body">
+            @foreach($balances as $b)
+                <div class="info-row">
+                    <span class="k">{{ $b['type'] }}</span>
+                    <span class="v">{{ $b['remaining'] }} of {{ $b['allotted'] }} days left <span style="color:var(--muted);font-weight:500;">({{ $b['used'] }} used)</span></span>
+                </div>
+            @endforeach
         </div>
     </div>
 

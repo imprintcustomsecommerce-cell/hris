@@ -5,9 +5,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use App\Models\User;
+use App\Support\Audit;
+use App\Support\LeaveBalance;
 use Carbon\Carbon;
 
 /*
@@ -44,6 +47,21 @@ Route::middleware('guest')->group(function () {
         }
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
+            // Block sign-in if the linked employee record is inactive.
+            $linked = Auth::user()->employee_id
+                ? DB::table('employees')->where('id', Auth::user()->employee_id)->first()
+                : null;
+
+            if ($linked && $linked->status === 'Inactive') {
+                Auth::logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+
+                return back()->withErrors([
+                    'email' => 'This account is inactive. Please contact HR.',
+                ])->onlyInput('email');
+            }
+
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
@@ -111,25 +129,54 @@ Route::middleware(['auth', 'password.changed'])->group(function () {
 */
 Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
 
-    Route::get('/tasks', function () {
+    // Employees this user may assign to: managers are limited to their own team.
+    $assignableEmployees = function () {
+        $query = DB::table('employees')->where('status', 'Active')->orderBy('name');
+
+        if (Auth::user()->role === 'Manager') {
+            $query->where('manager_id', Auth::user()->employee_id);
+        }
+
+        return $query->get();
+    };
+
+    Route::get('/tasks', function () use ($assignableEmployees) {
+        $assignable = $assignableEmployees();
+        $assignableIds = $assignable->pluck('id')->all();
+
         $tasks = DB::table('tasks')
             ->join('employees', 'tasks.assigned_to', '=', 'employees.id')
             ->leftJoin('users', 'tasks.assigned_by', '=', 'users.id')
             ->select('tasks.*', 'employees.name as employee_name', 'employees.position', 'users.name as assigner_name')
+            ->when(Auth::user()->role === 'Manager', function ($q) use ($assignableIds) {
+                // Managers see tasks they assigned or that belong to their team.
+                $q->where(function ($w) use ($assignableIds) {
+                    $w->where('tasks.assigned_by', Auth::id());
+                    if ($assignableIds) {
+                        $w->orWhereIn('tasks.assigned_to', $assignableIds);
+                    }
+                });
+            })
             ->orderBy('tasks.id', 'desc')
             ->get();
 
+        $base = DB::table('tasks');
+        if (Auth::user()->role === 'Manager') {
+            $ids = $assignableIds ?: [0];
+            $base = DB::table('tasks')->whereIn('assigned_to', $ids);
+        }
+
         return view('tasks.index', [
             'tasks' => $tasks,
-            'employees' => DB::table('employees')->where('status', 'Active')->orderBy('name')->get(),
-            'totalTasks' => DB::table('tasks')->count(),
-            'pendingTasks' => DB::table('tasks')->where('status', 'Pending')->count(),
-            'inProgressTasks' => DB::table('tasks')->where('status', 'In Progress')->count(),
-            'completedTasks' => DB::table('tasks')->where('status', 'Completed')->count(),
+            'employees' => $assignable,
+            'totalTasks' => (clone $base)->count(),
+            'pendingTasks' => (clone $base)->where('status', 'Pending')->count(),
+            'inProgressTasks' => (clone $base)->where('status', 'In Progress')->count(),
+            'completedTasks' => (clone $base)->where('status', 'Completed')->count(),
         ]);
     });
 
-    Route::post('/tasks', function (Request $request) {
+    Route::post('/tasks', function (Request $request) use ($assignableEmployees) {
         $request->validate([
             'assigned_to' => 'required|exists:employees,id',
             'title' => 'required|string|max:255',
@@ -137,6 +184,11 @@ Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
             'priority' => 'required|in:Low,Medium,High',
             'due_date' => 'nullable|date',
         ]);
+
+        // Managers can only assign within their team.
+        if (! $assignableEmployees()->pluck('id')->contains((int) $request->assigned_to)) {
+            abort(403, 'You can only assign tasks to your team members.');
+        }
 
         DB::table('tasks')->insert([
             'title' => $request->title,
@@ -150,7 +202,6 @@ Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
             'updated_at' => now(),
         ]);
 
-        // Notify the assigned employee's login account (if any).
         $recipient = DB::table('users')->where('employee_id', $request->assigned_to)->first();
         if ($recipient) {
             DB::table('notifications')->insert([
@@ -162,12 +213,62 @@ Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
             ]);
         }
 
+        Audit::log('task.assign', Auth::user()->name . ' assigned task "' . $request->title . '"');
+
         return redirect('/tasks')->with('success', 'Task assigned successfully.');
+    });
+
+    Route::get('/tasks/{id}/edit', function ($id) use ($assignableEmployees) {
+        $task = DB::table('tasks')->where('id', $id)->first();
+        abort_if(! $task, 404);
+        return view('tasks.edit', ['task' => $task, 'employees' => $assignableEmployees()]);
+    });
+
+    Route::put('/tasks/{id}', function (Request $request, $id) {
+        $task = DB::table('tasks')->where('id', $id)->first();
+        abort_if(! $task, 404);
+
+        $request->validate([
+            'assigned_to' => 'required|exists:employees,id',
+            'title' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'priority' => 'required|in:Low,Medium,High',
+            'due_date' => 'nullable|date',
+            'status' => 'required|in:Pending,In Progress,Completed',
+        ]);
+
+        DB::table('tasks')->where('id', $id)->update([
+            'assigned_to' => $request->assigned_to,
+            'title' => $request->title,
+            'description' => $request->description,
+            'priority' => $request->priority,
+            'due_date' => $request->due_date,
+            'status' => $request->status,
+            'updated_at' => now(),
+        ]);
+
+        Audit::log('task.update', Auth::user()->name . ' updated task "' . $request->title . '"');
+
+        return redirect('/tasks')->with('success', 'Task updated.');
     });
 
     Route::delete('/tasks/{id}', function ($id) {
         DB::table('tasks')->where('id', $id)->delete();
+        Audit::log('task.delete', Auth::user()->name . ' deleted a task');
         return redirect('/tasks')->with('success', 'Task deleted.');
+    });
+
+    // Team roster (managers see their team; Admin/HR see everyone with managers).
+    Route::get('/team', function () {
+        $query = DB::table('employees')
+            ->leftJoin('employees as mgr', 'employees.manager_id', '=', 'mgr.id')
+            ->select('employees.*', 'mgr.name as manager_name');
+
+        if (Auth::user()->role === 'Manager') {
+            $query->where('employees.manager_id', Auth::user()->employee_id);
+        }
+
+        return view('team.index', ['members' => $query->orderBy('employees.name')->get()]);
     });
 });
 
@@ -205,7 +306,7 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
     Route::get('/', function () use ($myEmployee) {
         $me = $myEmployee();
 
-        $data = ['me' => $me, 'recentAttendance' => collect(), 'pendingLeaves' => 0, 'lastPayslip' => null, 'leaveCount' => 0, 'payslipCount' => 0, 'openTasks' => 0, 'myTasks' => collect()];
+        $data = ['me' => $me, 'recentAttendance' => collect(), 'pendingLeaves' => 0, 'lastPayslip' => null, 'leaveCount' => 0, 'payslipCount' => 0, 'openTasks' => 0, 'myTasks' => collect(), 'today' => null, 'balances' => []];
 
         if ($me) {
             $data['recentAttendance'] = DB::table('attendances')->where('employee_id', $me->id)
@@ -218,9 +319,59 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             $data['openTasks'] = DB::table('tasks')->where('assigned_to', $me->id)->where('status', '!=', 'Completed')->count();
             $data['myTasks'] = DB::table('tasks')->where('assigned_to', $me->id)
                 ->orderBy('id', 'desc')->limit(5)->get();
+            $data['today'] = DB::table('attendances')->where('employee_id', $me->id)
+                ->whereDate('attendance_date', now()->toDateString())->first();
+            $data['balances'] = LeaveBalance::summary($me);
         }
 
         return view('portal.dashboard', $data);
+    });
+
+    // Self-service clock in / out for today.
+    Route::post('/clock-in', function () use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403);
+
+        $today = now()->toDateString();
+        $existing = DB::table('attendances')->where('employee_id', $me->id)->whereDate('attendance_date', $today)->first();
+
+        if ($existing && $existing->time_in) {
+            return redirect('/portal')->with('success', 'You already clocked in today.');
+        }
+
+        $status = now()->format('H:i') > '09:00' ? 'Late' : 'Present';
+
+        if ($existing) {
+            DB::table('attendances')->where('id', $existing->id)->update([
+                'time_in' => now()->format('H:i:s'), 'status' => $status, 'updated_at' => now(),
+            ]);
+        } else {
+            DB::table('attendances')->insert([
+                'employee_id' => $me->id, 'attendance_date' => $today,
+                'time_in' => now()->format('H:i:s'), 'status' => $status,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        return redirect('/portal')->with('success', 'Clocked in at ' . now()->format('h:i A') . ' (' . $status . ').');
+    });
+
+    Route::post('/clock-out', function () use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403);
+
+        $today = now()->toDateString();
+        $existing = DB::table('attendances')->where('employee_id', $me->id)->whereDate('attendance_date', $today)->first();
+
+        if (! $existing || ! $existing->time_in) {
+            return redirect('/portal')->with('success', 'Please clock in first.');
+        }
+
+        DB::table('attendances')->where('id', $existing->id)->update([
+            'time_out' => now()->format('H:i:s'), 'updated_at' => now(),
+        ]);
+
+        return redirect('/portal')->with('success', 'Clocked out at ' . now()->format('h:i A') . '.');
     });
 
     Route::get('/profile', function () use ($myEmployee) {
@@ -240,7 +391,11 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         $leaves = $me
             ? DB::table('leaves')->where('employee_id', $me->id)->orderBy('id', 'desc')->get()
             : collect();
-        return view('portal.leave', ['me' => $me, 'leaves' => $leaves]);
+        return view('portal.leave', [
+            'me' => $me,
+            'leaves' => $leaves,
+            'balances' => $me ? LeaveBalance::summary($me) : [],
+        ]);
     });
 
     Route::post('/leave', function (Request $request) use ($myEmployee) {
@@ -255,6 +410,14 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         ]);
 
         $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
+
+        // Enforce remaining balance for tracked leave types.
+        $remaining = LeaveBalance::remainingFor($me, $request->leave_type);
+        if ($remaining !== null && $totalDays > $remaining) {
+            return back()->withInput()->withErrors([
+                'leave_type' => "Insufficient {$request->leave_type} balance. You have {$remaining} day(s) left.",
+            ]);
+        }
 
         DB::table('leaves')->insert([
             'employee_id' => $me->id,
@@ -368,10 +531,20 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ->limit(5)
             ->get();
 
+        $headcountByDept = DB::table('employees')
+            ->select('department', DB::raw('COUNT(*) as total'))
+            ->groupBy('department')->orderBy('total', 'desc')->get();
+
+        $leaveByStatus = DB::table('leaves')
+            ->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->get();
+
         return view('welcome', [
             'stats' => $stats,
             'recentEmployees' => $recentEmployees,
             'pendingLeaveList' => $pendingLeaveList,
+            'headcountByDept' => $headcountByDept,
+            'leaveByStatus' => $leaveByStatus,
+            'upcomingHolidays' => DB::table('holidays')->whereDate('date', '>=', $today)->orderBy('date')->limit(4)->get(),
         ]);
     });
 
@@ -438,11 +611,24 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     /*
     | Employees
     */
-    Route::get('/employees', function () {
-        $employees = DB::table('employees')->orderBy('id', 'desc')->get();
+    Route::get('/employees', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+
+        $employees = DB::table('employees')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($w) use ($q) {
+                    $w->where('name', 'like', "%{$q}%")
+                        ->orWhere('employee_id', 'like', "%{$q}%")
+                        ->orWhere('department', 'like', "%{$q}%")
+                        ->orWhere('position', 'like', "%{$q}%");
+                });
+            })
+            ->orderBy('id', 'desc')
+            ->get();
 
         return view('employees.index', [
             'employees' => $employees,
+            'q' => $q,
             'totalEmployees' => DB::table('employees')->count(),
             'activeEmployees' => DB::table('employees')->where('status', 'Active')->count(),
             'onLeaveEmployees' => DB::table('employees')->where('status', 'On Leave')->count(),
@@ -453,6 +639,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     Route::get('/employees/create', function () {
         return view('employees.create', [
             'departments' => DB::table('departments')->orderBy('name')->get(),
+            'managers' => DB::table('employees')->orderBy('name')->get(),
         ]);
     })->middleware('role:Admin,HR');
 
@@ -469,6 +656,10 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'date_hired' => 'required|date',
             'employment_type' => 'nullable|string|max:255',
             'status' => 'required|string|max:255',
+            'manager_id' => 'nullable|exists:employees,id',
+            'vacation_credits' => 'nullable|integer|min:0|max:365',
+            'sick_credits' => 'nullable|integer|min:0|max:365',
+            'photo' => 'nullable|image|max:2048',
             'create_account' => 'nullable|boolean',
             'temp_password' => 'nullable|required_if:create_account,1|string|min:6',
         ]);
@@ -480,21 +671,31 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ], [], ['email' => 'email address']);
         }
 
+        $photoPath = $request->hasFile('photo')
+            ? $request->file('photo')->store('photos', 'public')
+            : null;
+
         $newId = DB::table('employees')->insertGetId([
             'name' => $request->name,
             'email' => $request->email,
             'contact_number' => $request->contact_number,
             'birthdate' => $request->birthdate,
             'address' => $request->address,
+            'photo' => $photoPath,
             'employee_id' => $request->employee_id,
             'department' => $request->department,
             'position' => $request->position,
+            'manager_id' => $request->manager_id,
             'date_hired' => $request->date_hired,
             'employment_type' => $request->employment_type,
             'status' => $request->status,
+            'vacation_credits' => $request->vacation_credits ?? 15,
+            'sick_credits' => $request->sick_credits ?? 15,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        Audit::log('employee.create', Auth::user()->name . ' added employee ' . $request->name);
 
         $message = 'Employee added successfully.';
 
@@ -533,6 +734,8 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'leaves' => $leaves,
             'payrolls' => $payrolls,
             'account' => $account,
+            'balances' => LeaveBalance::summary($employee),
+            'manager' => $employee->manager_id ? DB::table('employees')->where('id', $employee->manager_id)->first() : null,
         ]);
     });
 
@@ -582,6 +785,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         return view('employees.edit', [
             'employee' => $employee,
             'departments' => DB::table('departments')->orderBy('name')->get(),
+            'managers' => DB::table('employees')->where('id', '!=', $id)->orderBy('name')->get(),
         ]);
     })->middleware('role:Admin,HR');
 
@@ -598,9 +802,13 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'date_hired' => 'required|date',
             'employment_type' => 'nullable|string|max:255',
             'status' => 'required|string|max:255',
+            'manager_id' => 'nullable|exists:employees,id',
+            'vacation_credits' => 'nullable|integer|min:0|max:365',
+            'sick_credits' => 'nullable|integer|min:0|max:365',
+            'photo' => 'nullable|image|max:2048',
         ]);
 
-        DB::table('employees')->where('id', $id)->update([
+        $update = [
             'name' => $request->name,
             'email' => $request->email,
             'contact_number' => $request->contact_number,
@@ -609,17 +817,35 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'employee_id' => $request->employee_id,
             'department' => $request->department,
             'position' => $request->position,
+            'manager_id' => $request->manager_id ?: null,
             'date_hired' => $request->date_hired,
             'employment_type' => $request->employment_type,
             'status' => $request->status,
+            'vacation_credits' => $request->vacation_credits ?? 15,
+            'sick_credits' => $request->sick_credits ?? 15,
             'updated_at' => now(),
-        ]);
+        ];
+
+        if ($request->hasFile('photo')) {
+            $update['photo'] = $request->file('photo')->store('photos', 'public');
+        }
+
+        DB::table('employees')->where('id', $id)->update($update);
+
+        // Deactivate the linked login if the employee is set inactive.
+        if ($request->status === 'Inactive') {
+            DB::table('users')->where('employee_id', $id)->update(['updated_at' => now()]);
+        }
+
+        Audit::log('employee.update', Auth::user()->name . ' updated employee ' . $request->name);
 
         return redirect('/employees')->with('success', 'Employee updated successfully.');
     })->middleware('role:Admin,HR');
 
     Route::delete('/employees/{id}', function ($id) {
+        $emp = DB::table('employees')->where('id', $id)->first();
         DB::table('employees')->where('id', $id)->delete();
+        Audit::log('employee.delete', Auth::user()->name . ' deleted employee ' . ($emp->name ?? $id));
         return redirect('/employees')->with('success', 'Employee deleted successfully.');
     })->middleware('role:Admin,HR');
 
@@ -775,20 +1001,48 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     });
 
     Route::patch('/leave/{id}/approve', function ($id) {
+        $leave = DB::table('leaves')->where('id', $id)->first();
         DB::table('leaves')->where('id', $id)->update([
             'status' => 'Approved',
             'remarks' => 'Approved by ' . (Auth::user()->name ?? 'HR'),
             'updated_at' => now(),
         ]);
+
+        if ($leave) {
+            $recipient = DB::table('users')->where('employee_id', $leave->employee_id)->first();
+            if ($recipient) {
+                DB::table('notifications')->insert([
+                    'user_id' => $recipient->id,
+                    'message' => 'Your ' . $leave->leave_type . ' request was approved.',
+                    'url' => '/portal/leave', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+            Audit::log('leave.approve', Auth::user()->name . ' approved a leave request');
+        }
+
         return redirect('/leave')->with('success', 'Leave request approved successfully.');
     })->middleware('role:Admin,HR');
 
     Route::patch('/leave/{id}/reject', function ($id) {
+        $leave = DB::table('leaves')->where('id', $id)->first();
         DB::table('leaves')->where('id', $id)->update([
             'status' => 'Rejected',
             'remarks' => 'Rejected by ' . (Auth::user()->name ?? 'HR'),
             'updated_at' => now(),
         ]);
+
+        if ($leave) {
+            $recipient = DB::table('users')->where('employee_id', $leave->employee_id)->first();
+            if ($recipient) {
+                DB::table('notifications')->insert([
+                    'user_id' => $recipient->id,
+                    'message' => 'Your ' . $leave->leave_type . ' request was rejected.',
+                    'url' => '/portal/leave', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+            Audit::log('leave.reject', Auth::user()->name . ' rejected a leave request');
+        }
+
         return redirect('/leave')->with('success', 'Leave request rejected successfully.');
     })->middleware('role:Admin,HR');
 
@@ -888,6 +1142,20 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'payment_date' => now()->toDateString(),
             'updated_at' => now(),
         ]);
+
+        $pay = DB::table('payrolls')->where('id', $id)->first();
+        if ($pay) {
+            $recipient = DB::table('users')->where('employee_id', $pay->employee_id)->first();
+            if ($recipient) {
+                DB::table('notifications')->insert([
+                    'user_id' => $recipient->id,
+                    'message' => 'Your payslip for ' . $pay->payroll_month . ' ' . $pay->payroll_year . ' is now available.',
+                    'url' => '/portal/payslips', 'created_at' => now(), 'updated_at' => now(),
+                ]);
+            }
+        }
+        Audit::log('payroll.paid', Auth::user()->name . ' marked a payroll as paid');
+
         return redirect('/payroll')->with('success', 'Payroll marked as paid successfully.');
     })->middleware('role:Admin,HR');
 
@@ -931,4 +1199,70 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'totalPaid' => DB::table('payrolls')->where('status', 'Paid')->sum('net_pay'),
         ]);
     });
+
+    // CSV export: employees
+    Route::get('/reports/export/employees', function () {
+        $rows = DB::table('employees')->orderBy('name')->get();
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Employee ID', 'Name', 'Email', 'Department', 'Position', 'Status', 'Date Hired']);
+            foreach ($rows as $r) {
+                fputcsv($out, [$r->employee_id, $r->name, $r->email, $r->department, $r->position, $r->status, $r->date_hired]);
+            }
+            fclose($out);
+        }, 'employees-' . now()->format('Ymd') . '.csv', ['Content-Type' => 'text/csv']);
+    });
+
+    // CSV export: payroll
+    Route::get('/reports/export/payroll', function () {
+        $rows = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->select('payrolls.*', 'employees.name as employee_name', 'employees.employee_id as code')
+            ->orderBy('payrolls.id', 'desc')->get();
+        return response()->streamDownload(function () use ($rows) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Employee ID', 'Name', 'Period', 'Gross', 'Deductions', 'Net Pay', 'Status', 'Payment Date']);
+            foreach ($rows as $r) {
+                fputcsv($out, [$r->code, $r->employee_name, $r->payroll_month . ' ' . $r->payroll_year, $r->gross_pay, $r->deductions, $r->net_pay, $r->status, $r->payment_date]);
+            }
+            fclose($out);
+        }, 'payroll-' . now()->format('Ymd') . '.csv', ['Content-Type' => 'text/csv']);
+    });
+
+    /*
+    | Holidays
+    */
+    Route::get('/holidays', function () {
+        return view('holidays.index', [
+            'holidays' => DB::table('holidays')->orderBy('date')->get(),
+        ]);
+    });
+
+    Route::post('/holidays', function (Request $request) {
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'date' => 'required|date',
+            'type' => 'required|in:Regular,Special',
+        ]);
+        DB::table('holidays')->insert([
+            'name' => $request->name, 'date' => $request->date, 'type' => $request->type,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        Audit::log('holiday.create', Auth::user()->name . ' added holiday ' . $request->name);
+        return redirect('/holidays')->with('success', 'Holiday added.');
+    });
+
+    Route::delete('/holidays/{id}', function ($id) {
+        DB::table('holidays')->where('id', $id)->delete();
+        return redirect('/holidays')->with('success', 'Holiday removed.');
+    });
+
+    /*
+    | Audit log (Admin only)
+    */
+    Route::get('/audit', function () {
+        return view('audit.index', [
+            'logs' => DB::table('audit_logs')->orderBy('id', 'desc')->limit(200)->get(),
+        ]);
+    })->middleware('role:Admin');
 });
