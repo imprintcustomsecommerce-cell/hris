@@ -45,7 +45,7 @@ Route::middleware('guest')->group(function () {
             RateLimiter::clear($throttleKey);
             $request->session()->regenerate();
 
-            return redirect()->intended('/dashboard');
+            return redirect()->intended(Auth::user()->role === 'Employee' ? '/portal' : '/dashboard');
         }
 
         RateLimiter::hit($throttleKey); // 1 minute decay (default)
@@ -67,15 +67,116 @@ Route::post('/logout', function (Request $request) {
 | Landing page: show the login form to guests, dashboard to signed-in users.
 */
 Route::get('/', function () {
-    return Auth::check() ? redirect('/dashboard') : view('auth.login');
+    if (! Auth::check()) {
+        return view('auth.login');
+    }
+
+    return redirect(Auth::user()->role === 'Employee' ? '/portal' : '/dashboard');
 });
 
 /*
 |--------------------------------------------------------------------------
-| Protected HRIS Routes
+| Employee Self-Service Portal
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'role:Employee'])->prefix('portal')->group(function () {
+
+    // Resolve the linked employee record (shared by all portal routes).
+    $myEmployee = fn () => DB::table('employees')->where('id', Auth::user()->employee_id)->first();
+
+    Route::get('/', function () use ($myEmployee) {
+        $me = $myEmployee();
+
+        $data = ['me' => $me, 'recentAttendance' => collect(), 'pendingLeaves' => 0, 'lastPayslip' => null, 'leaveCount' => 0, 'payslipCount' => 0];
+
+        if ($me) {
+            $data['recentAttendance'] = DB::table('attendances')->where('employee_id', $me->id)
+                ->orderBy('attendance_date', 'desc')->limit(5)->get();
+            $data['pendingLeaves'] = DB::table('leaves')->where('employee_id', $me->id)->where('status', 'Pending')->count();
+            $data['leaveCount'] = DB::table('leaves')->where('employee_id', $me->id)->count();
+            $data['payslipCount'] = DB::table('payrolls')->where('employee_id', $me->id)->count();
+            $data['lastPayslip'] = DB::table('payrolls')->where('employee_id', $me->id)
+                ->orderBy('id', 'desc')->first();
+        }
+
+        return view('portal.dashboard', $data);
+    });
+
+    Route::get('/profile', function () use ($myEmployee) {
+        return view('portal.profile', ['me' => $myEmployee()]);
+    });
+
+    Route::get('/attendance', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $records = $me
+            ? DB::table('attendances')->where('employee_id', $me->id)->orderBy('attendance_date', 'desc')->get()
+            : collect();
+        return view('portal.attendance', ['me' => $me, 'records' => $records]);
+    });
+
+    Route::get('/leave', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $leaves = $me
+            ? DB::table('leaves')->where('employee_id', $me->id)->orderBy('id', 'desc')->get()
+            : collect();
+        return view('portal.leave', ['me' => $me, 'leaves' => $leaves]);
+    });
+
+    Route::post('/leave', function (Request $request) use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403, 'Your account is not linked to an employee record. Please contact HR.');
+
+        $request->validate([
+            'leave_type' => 'required|string|max:255',
+            'start_date' => 'required|date',
+            'end_date' => 'required|date|after_or_equal:start_date',
+            'reason' => 'nullable|string',
+        ]);
+
+        $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
+
+        DB::table('leaves')->insert([
+            'employee_id' => $me->id,
+            'leave_type' => $request->leave_type,
+            'start_date' => $request->start_date,
+            'end_date' => $request->end_date,
+            'total_days' => $totalDays,
+            'reason' => $request->reason,
+            'status' => 'Pending',
+            'remarks' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return redirect('/portal/leave')->with('success', 'Leave request submitted. Awaiting HR approval.');
+    });
+
+    Route::get('/payslips', function () use ($myEmployee) {
+        $me = $myEmployee();
+        $payrolls = $me
+            ? DB::table('payrolls')->where('employee_id', $me->id)->orderBy('id', 'desc')->get()
+            : collect();
+        return view('portal.payslips', ['me' => $me, 'payrolls' => $payrolls]);
+    });
+
+    Route::get('/payslips/{id}', function ($id) {
+        $payroll = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->select('payrolls.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->where('payrolls.id', $id)
+            ->where('payrolls.employee_id', Auth::user()->employee_id) // ownership check
+            ->first();
+        abort_if(! $payroll, 404);
+        return view('payroll.payslip', ['payroll' => $payroll]);
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| Protected HRIS Routes (Admin / HR backoffice)
+|--------------------------------------------------------------------------
+*/
+Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
 
     /*
     | Dashboard

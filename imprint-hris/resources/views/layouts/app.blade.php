@@ -13,22 +13,36 @@
 @php
     $role = auth()->user()->role ?? 'Employee';
     $isManager = in_array($role, ['Admin', 'HR']);
-    $nav = [
-        ['/dashboard', 'Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
-        ['/employees', 'Employees', 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-1.13a4 4 0 1 0-4-4 4 4 0 0 0 4 4z'],
-        ['/departments', 'Departments', 'M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01'],
-        ['/attendance', 'Attendance', 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
-        ['/leave', 'Leave', 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z'],
-        ['/payroll', 'Payroll', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
-        ['/reports', 'Reports', 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z'],
-    ];
+
+    if ($isManager) {
+        $nav = [
+            ['/dashboard', 'Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
+            ['/employees', 'Employees', 'M17 20h5v-2a4 4 0 0 0-3-3.87M9 20H4v-2a4 4 0 0 1 3-3.87m6-1.13a4 4 0 1 0-4-4 4 4 0 0 0 4 4z'],
+            ['/departments', 'Departments', 'M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01'],
+            ['/attendance', 'Attendance', 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+            ['/leave', 'Leave', 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z'],
+            ['/payroll', 'Payroll', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+            ['/reports', 'Reports', 'M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z'],
+        ];
+    } else {
+        $nav = [
+            ['/portal', 'My Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
+            ['/portal/profile', 'My Profile', 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM12 14a7 7 0 0 0-7 7h14a7 7 0 0 0-7-7z'],
+            ['/portal/attendance', 'My Attendance', 'M12 8v4l3 2m6-2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+            ['/portal/leave', 'My Leave', 'M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z'],
+            ['/portal/payslips', 'My Payslips', 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0z'],
+        ];
+    }
+
+    $home = $isManager ? '/dashboard' : '/portal';
+    $currentPath = '/' . trim(request()->path(), '/');
 @endphp
 
 <input type="checkbox" id="nav-toggle" class="nav-toggle-cb" hidden>
 
 <div class="shell">
     <aside class="sidebar">
-        <a href="/dashboard" class="brand">
+        <a href="{{ $home }}" class="brand">
             <div class="brand-icon"><img src="{{ asset('logoic.png') }}" alt="Imprint HRIS"></div>
             <div class="brand-text">
                 <span class="brand-name">Imprint HRIS</span>
@@ -38,7 +52,11 @@
 
         <nav class="nav">
             @foreach($nav as [$href, $label, $icon])
-                @php $active = $href === '/' ? request()->is('/') : request()->is(ltrim($href, '/') . '*'); @endphp
+                @php
+                    $active = in_array($href, ['/dashboard', '/portal'])
+                        ? $currentPath === $href
+                        : ($currentPath === $href || str_starts_with($currentPath, $href . '/'));
+                @endphp
                 <a href="{{ $href }}" class="nav-link {{ $active ? 'active' : '' }}">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{ $icon }}"></path></svg>
                     <span>{{ $label }}</span>
