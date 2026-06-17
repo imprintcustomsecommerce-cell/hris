@@ -31,6 +31,9 @@
             <h1>Welcome back</h1>
             <p class="sub">Sign in to your HRIS account.</p>
 
+            @if (session('success'))
+                <div class="auth-ok">{{ session('success') }}</div>
+            @endif
             @if ($errors->any())
                 <div class="auth-error">{{ $errors->first() }}</div>
             @endif
@@ -45,7 +48,10 @@
                     <label>Password</label>
                     <input type="password" name="password" placeholder="Enter your password" required>
                 </div>
-                <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
+                <div class="row-between">
+                    <label class="remember"><input type="checkbox" name="remember"> Remember me</label>
+                    <a class="forgot" href="/forgot-password">Forgot password?</a>
+                </div>
                 <button type="submit" class="submit">Sign In</button>
             </form>
 
@@ -96,7 +102,11 @@
     }
     .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
-    .remember { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); margin-bottom: 22px; }
+    .remember { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+    .row-between { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; gap: 12px; }
+    .forgot { font-size: 13px; font-weight: 700; color: #0a0a0a; text-decoration: none; }
+    .forgot:hover { text-decoration: underline; }
+    .auth-ok { background: #f4f4f5; color: #0a0a0a; border: 1px solid #e4e4e7; border-left: 4px solid #facc15; padding: 13px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; margin-bottom: 20px; }
 
     .submit {
         width: 100%; border: none; background: var(--accent); color: #1a1a1a; padding: 14px; border-radius: 12px;

@@ -4,13 +4,16 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\LeaveBalance;
+use App\Support\Notify;
 use App\Support\Workdays;
 use App\Support\PayrollCalculator;
 use Carbon\Carbon;
@@ -80,6 +83,49 @@ Route::middleware('guest')->group(function () {
             'email' => 'The provided credentials do not match our records.',
         ])->onlyInput('email');
     });
+
+    /*
+    | Password reset (forgot password)
+    */
+    Route::get('/forgot-password', function () {
+        return view('auth.forgot-password');
+    })->name('password.request');
+
+    Route::post('/forgot-password', function (Request $request) {
+        $request->validate(['email' => 'required|email']);
+
+        $status = Password::sendResetLink($request->only('email'));
+
+        return $status === Password::RESET_LINK_SENT
+            ? back()->with('success', 'A password reset link has been sent to your email.')
+            : back()->withErrors(['email' => __($status)]);
+    })->name('password.email');
+
+    Route::get('/reset-password/{token}', function (string $token, Request $request) {
+        return view('auth.reset-password', ['token' => $token, 'email' => $request->query('email')]);
+    })->name('password.reset');
+
+    Route::post('/reset-password', function (Request $request) {
+        $request->validate([
+            'token' => 'required',
+            'email' => 'required|email',
+            'password' => ['required', 'confirmed', PasswordRule::min(8)],
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'must_change_password' => false,
+                ])->save();
+            }
+        );
+
+        return $status === Password::PASSWORD_RESET
+            ? redirect('/login')->with('success', 'Your password has been reset. You can now sign in.')
+            : back()->withErrors(['email' => __($status)]);
+    })->name('password.update');
 });
 
 Route::post('/logout', function (Request $request) {
@@ -206,13 +252,7 @@ Route::middleware(['auth', 'role:Admin,HR,Manager'])->group(function () {
 
         $recipient = DB::table('users')->where('employee_id', $request->assigned_to)->first();
         if ($recipient) {
-            DB::table('notifications')->insert([
-                'user_id' => $recipient->id,
-                'message' => Auth::user()->name . ' assigned you a task: "' . $request->title . '"',
-                'url' => '/portal/tasks',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            Notify::send($recipient->id, Auth::user()->name . ' assigned you a task: "' . $request->title . '"', '/portal/tasks');
         }
 
         Audit::log('task.assign', Auth::user()->name . ' assigned task "' . $request->title . '"');
@@ -486,13 +526,7 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         ]);
 
         // Notify the assigner of the update.
-        DB::table('notifications')->insert([
-            'user_id' => $task->assigned_by,
-            'message' => $me->name . ' marked task "' . $task->title . '" as ' . $request->status,
-            'url' => '/tasks',
-            'created_at' => now(),
-            'updated_at' => now(),
-        ]);
+        Notify::send($task->assigned_by, $me->name . ' marked task "' . $task->title . '" as ' . $request->status, '/tasks');
 
         return redirect('/portal/tasks')->with('success', 'Task status updated.');
     });
@@ -1059,11 +1093,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         if ($leave) {
             $recipient = DB::table('users')->where('employee_id', $leave->employee_id)->first();
             if ($recipient) {
-                DB::table('notifications')->insert([
-                    'user_id' => $recipient->id,
-                    'message' => 'Your ' . $leave->leave_type . ' request was approved.',
-                    'url' => '/portal/leave', 'created_at' => now(), 'updated_at' => now(),
-                ]);
+                Notify::send($recipient->id, 'Your ' . $leave->leave_type . ' request was approved.', '/portal/leave');
             }
             Audit::log('leave.approve', Auth::user()->name . ' approved a leave request');
         }
@@ -1082,11 +1112,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         if ($leave) {
             $recipient = DB::table('users')->where('employee_id', $leave->employee_id)->first();
             if ($recipient) {
-                DB::table('notifications')->insert([
-                    'user_id' => $recipient->id,
-                    'message' => 'Your ' . $leave->leave_type . ' request was rejected.',
-                    'url' => '/portal/leave', 'created_at' => now(), 'updated_at' => now(),
-                ]);
+                Notify::send($recipient->id, 'Your ' . $leave->leave_type . ' request was rejected.', '/portal/leave');
             }
             Audit::log('leave.reject', Auth::user()->name . ' rejected a leave request');
         }
@@ -1214,11 +1240,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         if ($pay) {
             $recipient = DB::table('users')->where('employee_id', $pay->employee_id)->first();
             if ($recipient) {
-                DB::table('notifications')->insert([
-                    'user_id' => $recipient->id,
-                    'message' => 'Your payslip for ' . $pay->payroll_month . ' ' . $pay->payroll_year . ' is now available.',
-                    'url' => '/portal/payslips', 'created_at' => now(), 'updated_at' => now(),
-                ]);
+                Notify::send($recipient->id, 'Your payslip for ' . $pay->payroll_month . ' ' . $pay->payroll_year . ' is now available.', '/portal/payslips');
             }
         }
         Audit::log('payroll.paid', Auth::user()->name . ' marked a payroll as paid');

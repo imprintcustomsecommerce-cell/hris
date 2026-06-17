@@ -92,6 +92,14 @@ class HrisTest extends TestCase
         $this->assertEqualsWithDelta(200, $row->pagibig, 0.01);
     }
 
+    public function test_password_reset_link_can_be_requested(): void
+    {
+        $this->post('/forgot-password', ['email' => 'employee@imprintcustoms.ph'])
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('password_reset_tokens', ['email' => 'employee@imprintcustoms.ph']);
+    }
+
     public function test_workdays_excludes_weekends(): void
     {
         // 2026-06-15 (Mon) .. 2026-06-19 (Fri) = 5 weekdays.
