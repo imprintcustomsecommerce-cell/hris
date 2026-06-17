@@ -11,6 +11,8 @@ use Illuminate\Http\Request;
 use App\Models\User;
 use App\Support\Audit;
 use App\Support\LeaveBalance;
+use App\Support\Workdays;
+use App\Support\PayrollCalculator;
 use Carbon\Carbon;
 
 /*
@@ -409,7 +411,7 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             'reason' => 'nullable|string',
         ]);
 
-        $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
+        $totalDays = Workdays::between($request->start_date, $request->end_date);
 
         // Enforce remaining balance for tracked leave types.
         $remaining = LeaveBalance::remainingFor($me, $request->leave_type);
@@ -844,26 +846,43 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
 
     Route::delete('/employees/{id}', function ($id) {
         $emp = DB::table('employees')->where('id', $id)->first();
+        abort_if(! $emp, 404);
+
+        // Remove dependent records to avoid orphans.
+        DB::table('attendances')->where('employee_id', $id)->delete();
+        DB::table('leaves')->where('employee_id', $id)->delete();
+        DB::table('payrolls')->where('employee_id', $id)->delete();
+        DB::table('tasks')->where('assigned_to', $id)->delete();
+        DB::table('users')->where('employee_id', $id)->delete();           // their login
+        DB::table('employees')->where('manager_id', $id)->update(['manager_id' => null]); // unlink reports
         DB::table('employees')->where('id', $id)->delete();
+
         Audit::log('employee.delete', Auth::user()->name . ' deleted employee ' . ($emp->name ?? $id));
-        return redirect('/employees')->with('success', 'Employee deleted successfully.');
+        return redirect('/employees')->with('success', 'Employee and related records deleted.');
     })->middleware('role:Admin,HR');
 
     /*
     | Attendance
     */
-    Route::get('/attendance', function () {
+    Route::get('/attendance', function (Request $request) {
         $today = now()->toDateString();
+        $q = trim((string) $request->query('q', ''));
+        $status = $request->query('status', '');
 
         $attendanceRecords = DB::table('attendances')
             ->join('employees', 'attendances.employee_id', '=', 'employees.id')
             ->select('attendances.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) =>
+                $w->where('employees.name', 'like', "%{$q}%")->orWhere('employees.employee_id', 'like', "%{$q}%")))
+            ->when($status !== '', fn ($query) => $query->where('attendances.status', $status))
             ->orderBy('attendances.attendance_date', 'desc')
             ->orderBy('attendances.id', 'desc')
-            ->get();
+            ->paginate(15)->withQueryString();
 
         return view('attendance.index', [
             'attendanceRecords' => $attendanceRecords,
+            'q' => $q,
+            'status' => $status,
             'totalToday' => DB::table('attendances')->whereDate('attendance_date', $today)->count(),
             'presentToday' => DB::table('attendances')->whereDate('attendance_date', $today)->where('status', 'Present')->count(),
             'lateToday' => DB::table('attendances')->whereDate('attendance_date', $today)->where('status', 'Late')->count(),
@@ -886,6 +905,16 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'status' => 'required|string|in:Present,Late,Absent,Half Day,On Leave',
             'remarks' => 'nullable|string',
         ]);
+
+        $dupe = DB::table('attendances')
+            ->where('employee_id', $request->employee_id)
+            ->whereDate('attendance_date', $request->attendance_date)
+            ->exists();
+        if ($dupe) {
+            return back()->withInput()->withErrors([
+                'attendance_date' => 'An attendance record already exists for this employee on that date.',
+            ]);
+        }
 
         DB::table('attendances')->insert([
             'employee_id' => $request->employee_id,
@@ -920,6 +949,17 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'remarks' => 'nullable|string',
         ]);
 
+        $dupe = DB::table('attendances')
+            ->where('employee_id', $request->employee_id)
+            ->whereDate('attendance_date', $request->attendance_date)
+            ->where('id', '!=', $id)
+            ->exists();
+        if ($dupe) {
+            return back()->withInput()->withErrors([
+                'attendance_date' => 'Another attendance record already exists for this employee on that date.',
+            ]);
+        }
+
         DB::table('attendances')->where('id', $id)->update([
             'employee_id' => $request->employee_id,
             'attendance_date' => $request->attendance_date,
@@ -941,15 +981,23 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     /*
     | Leave
     */
-    Route::get('/leave', function () {
+    Route::get('/leave', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+        $status = $request->query('status', '');
+
         $leaveRequests = DB::table('leaves')
             ->join('employees', 'leaves.employee_id', '=', 'employees.id')
             ->select('leaves.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) =>
+                $w->where('employees.name', 'like', "%{$q}%")->orWhere('leaves.leave_type', 'like', "%{$q}%")))
+            ->when($status !== '', fn ($query) => $query->where('leaves.status', $status))
             ->orderBy('leaves.id', 'desc')
-            ->get();
+            ->paginate(15)->withQueryString();
 
         return view('leave.index', [
             'leaveRequests' => $leaveRequests,
+            'q' => $q,
+            'status' => $status,
             'totalLeaves' => DB::table('leaves')->count(),
             'pendingLeaves' => DB::table('leaves')->where('status', 'Pending')->count(),
             'approvedLeaves' => DB::table('leaves')->where('status', 'Approved')->count(),
@@ -972,7 +1020,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'reason' => 'nullable|string',
         ]);
 
-        $totalDays = Carbon::parse($request->start_date)->diffInDays(Carbon::parse($request->end_date)) + 1;
+        $totalDays = Workdays::between($request->start_date, $request->end_date);
 
         DB::table('leaves')->insert([
             'employee_id' => $request->employee_id,
@@ -1054,15 +1102,23 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     /*
     | Payroll
     */
-    Route::get('/payroll', function () {
+    Route::get('/payroll', function (Request $request) {
+        $q = trim((string) $request->query('q', ''));
+        $status = $request->query('status', '');
+
         $payrollRecords = DB::table('payrolls')
             ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
             ->select('payrolls.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) =>
+                $w->where('employees.name', 'like', "%{$q}%")->orWhere('payrolls.payroll_month', 'like', "%{$q}%")))
+            ->when($status !== '', fn ($query) => $query->where('payrolls.status', $status))
             ->orderBy('payrolls.id', 'desc')
-            ->get();
+            ->paginate(15)->withQueryString();
 
         return view('payroll.index', [
             'payrollRecords' => $payrollRecords,
+            'q' => $q,
+            'status' => $status,
             'totalPayrolls' => DB::table('payrolls')->count(),
             'pendingPayrolls' => DB::table('payrolls')->where('status', 'Pending')->count(),
             'paidPayrolls' => DB::table('payrolls')->where('status', 'Paid')->count(),
@@ -1084,17 +1140,21 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'basic_salary' => 'required|numeric|min:0',
             'allowances' => 'nullable|numeric|min:0',
             'overtime_pay' => 'nullable|numeric|min:0',
-            'deductions' => 'nullable|numeric|min:0',
+            'other_deductions' => 'nullable|numeric|min:0',
             'remarks' => 'nullable|string',
         ]);
 
-        $basicSalary = $request->basic_salary ?? 0;
-        $allowances = $request->allowances ?? 0;
-        $overtimePay = $request->overtime_pay ?? 0;
-        $deductions = $request->deductions ?? 0;
+        $basicSalary = (float) ($request->basic_salary ?? 0);
+        $allowances = (float) ($request->allowances ?? 0);
+        $overtimePay = (float) ($request->overtime_pay ?? 0);
+        $otherDeductions = (float) ($request->other_deductions ?? 0);
+
+        // Auto-compute PH statutory contributions + withholding tax.
+        $stat = PayrollCalculator::deductions($basicSalary);
+        $totalDeductions = $stat['sss'] + $stat['philhealth'] + $stat['pagibig'] + $stat['tax'] + $otherDeductions;
 
         $grossPay = $basicSalary + $allowances + $overtimePay;
-        $netPay = $grossPay - $deductions;
+        $netPay = $grossPay - $totalDeductions;
 
         DB::table('payrolls')->insert([
             'employee_id' => $request->employee_id,
@@ -1103,7 +1163,12 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'basic_salary' => $basicSalary,
             'allowances' => $allowances,
             'overtime_pay' => $overtimePay,
-            'deductions' => $deductions,
+            'sss' => $stat['sss'],
+            'philhealth' => $stat['philhealth'],
+            'pagibig' => $stat['pagibig'],
+            'tax' => $stat['tax'],
+            'other_deductions' => $otherDeductions,
+            'deductions' => round($totalDeductions, 2),
             'gross_pay' => $grossPay,
             'net_pay' => $netPay,
             'status' => 'Pending',
@@ -1113,7 +1178,9 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'updated_at' => now(),
         ]);
 
-        return redirect('/payroll')->with('success', 'Payroll record added successfully.');
+        Audit::log('payroll.create', Auth::user()->name . ' created a payroll record');
+
+        return redirect('/payroll')->with('success', 'Payroll added. Statutory deductions were computed automatically.');
     })->middleware('role:Admin,HR');
 
     Route::get('/payroll/{id}', function ($id) {
@@ -1190,11 +1257,23 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ->orderBy('payroll_year', 'desc')
             ->get();
 
+        // 13th-month pay = (total basic salary earned this year) / 12, per employee.
+        $year = (int) now()->format('Y');
+        $thirteenthMonth = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->where('payrolls.payroll_year', $year)
+            ->groupBy('employees.id', 'employees.name')
+            ->select('employees.name as employee_name', DB::raw('SUM(payrolls.basic_salary) as total_basic'), DB::raw('SUM(payrolls.basic_salary) / 12 as thirteenth'))
+            ->orderBy('employees.name')
+            ->get();
+
         return view('reports.index', [
             'headcountByDept' => $headcountByDept,
             'attendanceSummary' => $attendanceSummary,
             'leaveSummary' => $leaveSummary,
             'payrollByMonth' => $payrollByMonth,
+            'thirteenthMonth' => $thirteenthMonth,
+            'reportYear' => $year,
             'totalEmployees' => DB::table('employees')->count(),
             'totalPaid' => DB::table('payrolls')->where('status', 'Paid')->sum('net_pay'),
         ]);

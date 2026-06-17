@@ -71,4 +71,24 @@
             </div>
         </div>
     </div>
+
+    <div class="card" style="margin-top:18px;">
+        <div class="card-head"><h2>13th Month Pay Estimate ({{ $reportYear }})</h2></div>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Employee</th><th>Total Basic Earned</th><th>13th Month (÷12)</th></tr></thead>
+                <tbody>
+                    @forelse($thirteenthMonth as $row)
+                        <tr>
+                            <td>{{ $row->employee_name }}</td>
+                            <td>₱{{ number_format($row->total_basic, 2) }}</td>
+                            <td><strong style="color:var(--accent);">₱{{ number_format($row->thirteenth, 2) }}</strong></td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="3"><p class="muted">No payroll data for {{ $reportYear }} yet.</p></td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 @endsection

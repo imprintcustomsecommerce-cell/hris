@@ -43,14 +43,15 @@
                 </div>
 
                 <div class="form-section">
-                    <h3>Earnings & Deductions</h3>
+                    <h3>Earnings</h3>
                     <div class="form-grid">
                         <div class="field"><label>Basic Salary (₱)</label><input type="number" step="0.01" min="0" name="basic_salary" value="{{ old('basic_salary') }}" placeholder="0.00" required></div>
                         <div class="field"><label>Allowances (₱)</label><input type="number" step="0.01" min="0" name="allowances" value="{{ old('allowances', 0) }}" placeholder="0.00"></div>
                         <div class="field"><label>Overtime Pay (₱)</label><input type="number" step="0.01" min="0" name="overtime_pay" value="{{ old('overtime_pay', 0) }}" placeholder="0.00"></div>
-                        <div class="field"><label>Deductions (₱)</label><input type="number" step="0.01" min="0" name="deductions" value="{{ old('deductions', 0) }}" placeholder="0.00"></div>
+                        <div class="field"><label>Other Deductions (₱)</label><input type="number" step="0.01" min="0" name="other_deductions" value="{{ old('other_deductions', 0) }}" placeholder="0.00"></div>
                         <div class="field full"><label>Remarks</label><textarea name="remarks" rows="3" placeholder="Optional remarks">{{ old('remarks') }}</textarea></div>
                     </div>
+                    <p class="muted" style="margin-top:14px;">SSS, PhilHealth, Pag-IBIG and withholding tax are computed automatically from the basic salary.</p>
                 </div>
 
                 <div class="form-actions">

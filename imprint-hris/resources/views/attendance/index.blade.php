@@ -27,7 +27,21 @@
     </div>
 
     <div class="card">
-        <div class="card-head"><h2>Attendance Log</h2></div>
+        <div class="card-head">
+            <h2>Attendance Log</h2>
+            <form method="GET" action="/attendance" style="display:flex; gap:8px; flex-wrap:wrap;">
+                <div class="search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+                    <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Search employee..." style="width:200px;">
+                </div>
+                <select name="status" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-size:14px;font-weight:600;font-family:inherit;">
+                    <option value="">All statuses</option>
+                    @foreach(['Present','Late','Absent','Half Day','On Leave'] as $s)
+                        <option value="{{ $s }}" {{ ($status ?? '') === $s ? 'selected' : '' }}>{{ $s }}</option>
+                    @endforeach
+                </select>
+            </form>
+        </div>
         <div class="table-wrap">
             <table>
                 <thead>
@@ -80,5 +94,6 @@
                 </tbody>
             </table>
         </div>
+        @include('partials.pager', ['p' => $attendanceRecords])
     </div>
 @endsection

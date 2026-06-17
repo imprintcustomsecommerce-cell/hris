@@ -47,7 +47,11 @@
         </div>
         <div class="ps-col">
             <h3>Deductions</h3>
-            <div class="ps-row"><span>Total Deductions</span><strong>₱{{ number_format($payroll->deductions, 2) }}</strong></div>
+            <div class="ps-row"><span>SSS</span><strong>₱{{ number_format($payroll->sss, 2) }}</strong></div>
+            <div class="ps-row"><span>PhilHealth</span><strong>₱{{ number_format($payroll->philhealth, 2) }}</strong></div>
+            <div class="ps-row"><span>Pag-IBIG</span><strong>₱{{ number_format($payroll->pagibig, 2) }}</strong></div>
+            <div class="ps-row"><span>Withholding Tax</span><strong>₱{{ number_format($payroll->tax, 2) }}</strong></div>
+            <div class="ps-row"><span>Other</span><strong>₱{{ number_format($payroll->other_deductions, 2) }}</strong></div>
             <div class="ps-row total"><span>Total Deductions</span><strong>₱{{ number_format($payroll->deductions, 2) }}</strong></div>
         </div>
     </section>
