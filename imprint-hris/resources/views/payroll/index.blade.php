@@ -66,6 +66,7 @@
                                 <div class="actions">
                                     <a href="/payroll/{{ $payroll->id }}" class="btn btn-ghost btn-sm">View</a>
                                     <a href="/payroll/{{ $payroll->id }}/payslip" class="btn btn-ghost btn-sm" target="_blank">Payslip</a>
+                                    <a href="/payroll/{{ $payroll->id }}/payslip/pdf" class="btn btn-ghost btn-sm">PDF</a>
                                     @if(in_array(auth()->user()->role, ['Admin', 'HR']))
                                         @if($payroll->status === 'Pending')
                                             <form action="/payroll/{{ $payroll->id }}/paid" method="POST">@csrf @method('PATCH')<button type="submit" class="btn btn-success btn-sm">Mark Paid</button></form>

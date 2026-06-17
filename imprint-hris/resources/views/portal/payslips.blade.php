@@ -25,7 +25,12 @@
                             <td>₱{{ number_format($p->deductions, 2) }}</td>
                             <td><strong style="color:var(--text);">₱{{ number_format($p->net_pay, 2) }}</strong></td>
                             <td><span class="badge {{ $sc }}">{{ $p->status }}</span></td>
-                            <td><a href="/portal/payslips/{{ $p->id }}" class="btn btn-ghost btn-sm" target="_blank">View Payslip</a></td>
+                            <td>
+                                <div class="actions">
+                                    <a href="/portal/payslips/{{ $p->id }}" class="btn btn-ghost btn-sm" target="_blank">View</a>
+                                    <a href="/portal/payslips/{{ $p->id }}/pdf" class="btn btn-ghost btn-sm">PDF</a>
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr><td colspan="6">

@@ -496,6 +496,19 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         return view('payroll.payslip', ['payroll' => $payroll]);
     });
 
+    Route::get('/payslips/{id}/pdf', function ($id) {
+        $payroll = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->select('payrolls.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->where('payrolls.id', $id)
+            ->where('payrolls.employee_id', Auth::user()->employee_id) // ownership check
+            ->first();
+        abort_if(! $payroll, 404);
+
+        $pdf = Barryvdh\DomPDF\Facade\Pdf::loadView('payroll.payslip-pdf', ['payroll' => $payroll]);
+        return $pdf->download('payslip-' . $payroll->payroll_month . $payroll->payroll_year . '.pdf');
+    });
+
     Route::get('/tasks', function () use ($myEmployee) {
         $me = $myEmployee();
         $tasks = $me
@@ -1227,6 +1240,18 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             ->first();
         abort_if(! $payroll, 404);
         return view('payroll.payslip', ['payroll' => $payroll]);
+    });
+
+    Route::get('/payroll/{id}/payslip/pdf', function ($id) {
+        $payroll = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->select('payrolls.*', 'employees.name as employee_name', 'employees.employee_id as employee_code', 'employees.department', 'employees.position')
+            ->where('payrolls.id', $id)
+            ->first();
+        abort_if(! $payroll, 404);
+
+        $pdf = Barryvdh\DomPDF\Facade\Pdf::loadView('payroll.payslip-pdf', ['payroll' => $payroll]);
+        return $pdf->download('payslip-' . $payroll->employee_code . '-' . $payroll->payroll_month . $payroll->payroll_year . '.pdf');
     });
 
     Route::patch('/payroll/{id}/paid', function ($id) {

@@ -10,7 +10,10 @@
 
 <div class="toolbar no-print">
     <a href="/payroll" class="tb-btn">← Back</a>
-    <button onclick="window.print()" class="tb-btn primary">🖨 Print Payslip</button>
+    <div style="display:flex; gap:10px;">
+        <a href="{{ url()->current() }}/pdf" class="tb-btn">⬇ Download PDF</a>
+        <button onclick="window.print()" class="tb-btn primary">🖨 Print Payslip</button>
+    </div>
 </div>
 
 <main class="payslip">
