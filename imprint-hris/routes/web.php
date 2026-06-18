@@ -895,6 +895,22 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
         return redirect('/portal/leave')->with('success', 'Leave request submitted. Awaiting HR approval.');
     });
 
+    // Cancel own pending leave request
+    Route::patch('/leave/{id}/cancel', function ($id) use ($myEmployee) {
+        $me = $myEmployee();
+        abort_if(! $me, 403);
+
+        $leave = DB::table('leaves')->where('id', $id)->where('employee_id', $me->id)->first();
+        abort_if(! $leave, 404);
+
+        if ($leave->status !== 'Pending') {
+            return redirect('/portal/leave')->with('success', 'Only pending requests can be cancelled.');
+        }
+
+        DB::table('leaves')->where('id', $id)->update(['status' => 'Cancelled', 'updated_at' => now()]);
+        return redirect('/portal/leave')->with('success', 'Leave request cancelled.');
+    });
+
     Route::get('/payslips', function () use ($myEmployee) {
         $me = $myEmployee();
         $payrolls = $me
