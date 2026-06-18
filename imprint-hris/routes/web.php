@@ -1115,6 +1115,18 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     })->middleware('role:Admin,HR');
 
     /*
+    | Org chart
+    */
+    Route::get('/org-chart', function () {
+        $all = DB::table('employees')->orderBy('name')->get();
+        return view('org.index', [
+            'roots' => $all->whereNull('manager_id')->values(),
+            'children' => $all->groupBy('manager_id'),
+            'total' => $all->count(),
+        ]);
+    });
+
+    /*
     | Employees
     */
     Route::get('/employees', function (Request $request) {
