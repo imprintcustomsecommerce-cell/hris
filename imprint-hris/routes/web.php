@@ -1574,6 +1574,47 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         ]);
     });
 
+    Route::get('/leave-calendar', function (Request $request) {
+        $month = $request->query('month');
+        $base = $month ? Carbon::parse($month . '-01') : Carbon::now()->startOfMonth();
+        $monthStart = $base->copy()->startOfMonth();
+        $monthEnd = $base->copy()->endOfMonth();
+
+        $gridStart = $monthStart->copy()->startOfWeek(Carbon::SUNDAY);
+        $gridEnd = $monthEnd->copy()->endOfWeek(Carbon::SATURDAY);
+
+        $holidays = DB::table('holidays')
+            ->whereBetween('date', [$monthStart->toDateString(), $monthEnd->toDateString()])
+            ->get()->keyBy(fn ($h) => Carbon::parse($h->date)->toDateString());
+
+        $leaves = DB::table('leaves')
+            ->join('employees', 'leaves.employee_id', '=', 'employees.id')
+            ->where('leaves.status', 'Approved')
+            ->whereDate('leaves.start_date', '<=', $monthEnd->toDateString())
+            ->whereDate('leaves.end_date', '>=', $monthStart->toDateString())
+            ->select('employees.name as employee_name', 'leaves.start_date', 'leaves.end_date', 'leaves.leave_type')
+            ->get();
+
+        $days = [];
+        for ($d = $gridStart->copy(); $d->lte($gridEnd); $d->addDay()) {
+            $ds = $d->toDateString();
+            $days[] = [
+                'date' => $d->copy(),
+                'inMonth' => $d->month === $base->month,
+                'isToday' => $d->isToday(),
+                'holiday' => $holidays[$ds]->name ?? null,
+                'leaves' => $leaves->filter(fn ($l) => $ds >= $l->start_date && $ds <= $l->end_date)->values(),
+            ];
+        }
+
+        return view('leave.calendar', [
+            'days' => $days,
+            'title' => $base->format('F Y'),
+            'prev' => $base->copy()->subMonth()->format('Y-m'),
+            'next' => $base->copy()->addMonth()->format('Y-m'),
+        ]);
+    });
+
     Route::get('/leave/create', function () {
         return view('leave.create', [
             'employees' => DB::table('employees')->where('status', 'Active')->orderBy('name')->get(),
