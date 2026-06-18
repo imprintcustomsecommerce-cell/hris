@@ -1945,6 +1945,64 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     });
 
     /*
+    | Government remittance reports (SSS / PhilHealth / Pag-IBIG / BIR)
+    */
+    Route::get('/remittances', function (Request $request) {
+        $month = $request->query('month', now()->format('F'));
+        $year = (int) $request->query('year', now()->format('Y'));
+
+        $rows = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->where('payrolls.payroll_month', $month)
+            ->where('payrolls.payroll_year', $year)
+            ->select('employees.name as employee_name', 'employees.employee_id as code',
+                'payrolls.basic_salary', 'payrolls.sss', 'payrolls.philhealth', 'payrolls.pagibig', 'payrolls.tax')
+            ->orderBy('employees.name')
+            ->get();
+
+        $years = DB::table('payrolls')->select('payroll_year')->distinct()->orderBy('payroll_year', 'desc')->pluck('payroll_year');
+
+        return view('remittances.index', [
+            'rows' => $rows,
+            'month' => $month,
+            'year' => $year,
+            'years' => $years->isEmpty() ? collect([(int) now()->format('Y')]) : $years,
+            'totals' => [
+                'sss' => $rows->sum('sss'),
+                'philhealth' => $rows->sum('philhealth'),
+                'pagibig' => $rows->sum('pagibig'),
+                'tax' => $rows->sum('tax'),
+            ],
+        ]);
+    });
+
+    Route::get('/remittances/export', function (Request $request) {
+        $month = $request->query('month', now()->format('F'));
+        $year = (int) $request->query('year', now()->format('Y'));
+        $agency = $request->query('agency', 'sss');
+        $col = in_array($agency, ['sss', 'philhealth', 'pagibig', 'tax'], true) ? $agency : 'sss';
+        $label = ['sss' => 'SSS', 'philhealth' => 'PhilHealth', 'pagibig' => 'Pag-IBIG', 'tax' => 'Withholding Tax'][$col];
+
+        $rows = DB::table('payrolls')
+            ->join('employees', 'payrolls.employee_id', '=', 'employees.id')
+            ->where('payrolls.payroll_month', $month)
+            ->where('payrolls.payroll_year', $year)
+            ->select('employees.name as employee_name', 'employees.employee_id as code', 'payrolls.basic_salary', "payrolls.$col as amount")
+            ->orderBy('employees.name')->get();
+
+        return response()->streamDownload(function () use ($rows, $label, $month, $year) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, [$label . ' Contribution Report', $month . ' ' . $year]);
+            fputcsv($out, ['Employee ID', 'Name', 'Basic Salary', $label]);
+            foreach ($rows as $r) {
+                fputcsv($out, [$r->code, $r->employee_name, $r->basic_salary, $r->amount]);
+            }
+            fputcsv($out, ['', '', 'TOTAL', $rows->sum('amount')]);
+            fclose($out);
+        }, strtolower($col) . '-' . $month . $year . '.csv', ['Content-Type' => 'text/csv']);
+    });
+
+    /*
     | Holidays
     */
     Route::get('/holidays', function () {
