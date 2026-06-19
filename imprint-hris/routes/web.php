@@ -76,7 +76,7 @@ Route::middleware('guest')->group(function () {
                 'Employee' => '/portal',
                 'Manager' => '/tasks',
                 'Applicant' => '/apply',
-                'CEO' => '/projects',
+                'CEO' => '/exec-dashboard',
                 default => '/dashboard',
             });
         }
@@ -151,7 +151,7 @@ Route::get('/', function () {
         'Employee' => '/portal',
         'Manager' => '/tasks',
         'Applicant' => '/apply',
-        'CEO' => '/projects',
+        'CEO' => '/exec-dashboard',
         default => '/dashboard',
     });
 });
@@ -182,7 +182,7 @@ Route::middleware('auth')->group(function () {
             'Employee' => '/portal',
             'Manager' => '/tasks',
             'Applicant' => '/apply',
-            'CEO' => '/projects',
+            'CEO' => '/exec-dashboard',
             default => '/dashboard',
         };
 
@@ -433,6 +433,39 @@ Route::middleware(['auth', 'role:Admin,CEO,Manager'])->group(function () {
         // CEO/Admin manage all; a Manager manages only their assigned projects.
         return in_array(Auth::user()->role, ['Admin', 'CEO'], true) || $project->manager_id === Auth::id();
     };
+
+    // Executive dashboard (CEO / Admin)
+    Route::get('/exec-dashboard', function () {
+        $today = now()->toDateString();
+
+        $projects = DB::table('projects')->get();
+        $stats = [
+            'employees' => DB::table('employees')->count(),
+            'active' => DB::table('employees')->where('status', 'Active')->count(),
+            'departments' => DB::table('departments')->count(),
+            'netPaid' => DB::table('payrolls')->where('status', 'Paid')->sum('net_pay'),
+            'pendingLeaves' => DB::table('leaves')->where('status', 'Pending')->count(),
+            'projTotal' => $projects->count(),
+            'projInProgress' => $projects->where('status', 'In Progress')->count(),
+            'projCompleted' => $projects->where('status', 'Completed')->count(),
+            'projOverdue' => $projects->filter(fn ($p) => $p->status !== 'Completed' && $p->deadline && $p->deadline < $today)->count(),
+        ];
+
+        $headcountByDept = DB::table('employees')
+            ->select('department', DB::raw('COUNT(*) as total'))
+            ->groupBy('department')->orderBy('total', 'desc')->get();
+
+        $progress = DB::table('tasks')
+            ->select('project_id', DB::raw('COUNT(*) as total'), DB::raw("SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as done"))
+            ->whereNotNull('project_id')->groupBy('project_id')->get()->keyBy('project_id');
+
+        $recentProjects = DB::table('projects')
+            ->leftJoin('users', 'projects.manager_id', '=', 'users.id')
+            ->select('projects.*', 'users.name as manager_name')
+            ->orderBy('projects.id', 'desc')->limit(6)->get();
+
+        return view('exec.dashboard', compact('stats', 'headcountByDept', 'progress', 'recentProjects'));
+    })->middleware('role:Admin,CEO');
 
     Route::get('/projects', function () {
         $isExec = in_array(Auth::user()->role, ['Admin', 'CEO'], true);

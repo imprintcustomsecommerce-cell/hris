@@ -53,9 +53,10 @@
         $home = '/dashboard';
     } elseif ($role === 'CEO') {
         $nav = [
+            ['/exec-dashboard', 'Dashboard', 'M3 12l9-9 9 9M5 10v10h5v-6h4v6h5V10'],
             ['/projects', 'Projects', 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
         ];
-        $home = '/projects';
+        $home = '/exec-dashboard';
     } elseif ($role === 'Manager') {
         $nav = [
             ['/projects', 'Projects', 'M9 11l3 3L22 4M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11'],
