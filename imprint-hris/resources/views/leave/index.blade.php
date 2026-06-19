@@ -36,7 +36,7 @@
                 </div>
                 <select name="status" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-size:14px;font-weight:600;font-family:inherit;">
                     <option value="">All statuses</option>
-                    @foreach(['Pending','Approved','Rejected'] as $s)
+                    @foreach(['Pending','Approved','Rejected','Cancelled'] as $s)
                         <option value="{{ $s }}" {{ ($status ?? '') === $s ? 'selected' : '' }}>{{ $s }}</option>
                     @endforeach
                 </select>
@@ -49,7 +49,7 @@
                 </thead>
                 <tbody>
                     @forelse($leaveRequests ?? [] as $leave)
-                        @php $sc = ['Pending'=>'amber','Approved'=>'green','Rejected'=>'red'][$leave->status] ?? 'gray'; @endphp
+                        @php $sc = ['Pending'=>'amber','Approved'=>'green','Rejected'=>'red','Cancelled'=>'gray'][$leave->status] ?? 'gray'; @endphp
                         <tr>
                             <td>
                                 <div class="cell-user">

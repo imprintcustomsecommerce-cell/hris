@@ -28,18 +28,26 @@
             <div class="card-head"><h2>My Requests</h2></div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th></tr></thead>
+                    <thead><tr><th>Type</th><th>Dates</th><th>Days</th><th>Status</th><th></th></tr></thead>
                     <tbody>
                         @forelse($leaves as $leave)
-                            @php $sc = ['Pending'=>'amber','Approved'=>'green','Rejected'=>'red'][$leave->status] ?? 'gray'; @endphp
+                            @php $sc = ['Pending'=>'amber','Approved'=>'green','Rejected'=>'red','Cancelled'=>'gray'][$leave->status] ?? 'gray'; @endphp
                             <tr>
                                 <td>{{ $leave->leave_type }}</td>
                                 <td>{{ date('M d', strtotime($leave->start_date)) }} – {{ date('M d, Y', strtotime($leave->end_date)) }}</td>
                                 <td>{{ $leave->total_days }}</td>
                                 <td><span class="badge {{ $sc }}">{{ $leave->status }}</span></td>
+                                <td>
+                                    @if($leave->status === 'Pending')
+                                        <form action="/portal/leave/{{ $leave->id }}/cancel" method="POST" onsubmit="return confirm('Cancel this leave request?')" style="margin:0;">
+                                            @csrf @method('PATCH')
+                                            <button type="submit" class="btn btn-danger btn-sm">Cancel</button>
+                                        </form>
+                                    @endif
+                                </td>
                             </tr>
                         @empty
-                            <tr><td colspan="4"><p class="muted">No leave requests yet.</p></td></tr>
+                            <tr><td colspan="5"><p class="muted">No leave requests yet.</p></td></tr>
                         @endforelse
                     </tbody>
                 </table>
