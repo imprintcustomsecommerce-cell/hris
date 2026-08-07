@@ -12,7 +12,7 @@
         <div class="page-head">
             <div class="profile-hero">
                 @if($me->photo)
-                    <img class="avatar" src="{{ asset('storage/' . $me->photo) }}" alt="" style="object-fit:cover;">
+                    <img class="avatar" src="{{ \App\Support\Blob::url($me->photo) }}" alt="" style="object-fit:cover;">
                 @else
                     <div class="avatar">{{ strtoupper(substr($me->name ?? 'E', 0, 1)) }}</div>
                 @endif

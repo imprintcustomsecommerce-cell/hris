@@ -226,7 +226,7 @@ Route::middleware(['auth', 'role:Applicant', 'password.changed'])->prefix('apply
             'document' => 'required|file|max:10240',
         ]);
 
-        $path = $request->file('document')->store('applicant-documents');
+        $path = \App\Support\Blob::put($request->file('document'), 'applicant-documents');
 
         DB::table('applicant_documents')->insert([
             'applicant_id' => $applicant->id,
@@ -245,8 +245,8 @@ Route::middleware(['auth', 'role:Applicant', 'password.changed'])->prefix('apply
     Route::get('/documents/{id}/download', function ($id) use ($me) {
         $applicant = $me();
         $doc = DB::table('applicant_documents')->where('id', $id)->where('applicant_id', optional($applicant)->id)->first();
-        abort_if(! $doc || ! Storage::disk('local')->exists($doc->file_path), 404);
-        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+        abort_if(! $doc || ! \App\Support\Blob::exists($doc->file_path), 404);
+        return \App\Support\Blob::download($doc->file_path, $doc->original_name ?? $doc->name);
     });
 
     Route::get('/interviews', function () use ($me) {
@@ -861,9 +861,9 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
 
         if ($request->hasFile('photo')) {
             if ($me->photo) {
-                Storage::disk('public')->delete($me->photo);
+                \App\Support\Blob::delete($me->photo, 'public');
             }
-            $update['photo'] = $request->file('photo')->store('photos', 'public');
+            $update['photo'] = \App\Support\Blob::put($request->file('photo'), 'photos', 'public');
         }
 
         DB::table('employees')->where('id', $me->id)->update($update);
@@ -991,8 +991,8 @@ Route::middleware(['auth', 'role:Employee', 'password.changed'])->prefix('portal
             ->where('employee_id', Auth::user()->employee_id) // ownership check
             ->first();
         abort_if(! $doc, 404);
-        abort_if(! Storage::disk('local')->exists($doc->file_path), 404);
-        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+        abort_if(! \App\Support\Blob::exists($doc->file_path), 404);
+        return \App\Support\Blob::download($doc->file_path, $doc->original_name ?? $doc->name);
     });
 
     // My performance reviews (finalized only)
@@ -1241,7 +1241,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         }
 
         $photoPath = $request->hasFile('photo')
-            ? $request->file('photo')->store('photos', 'public')
+            ? \App\Support\Blob::put($request->file('photo'), 'photos', 'public')
             : null;
 
         $newId = DB::table('employees')->insertGetId([
@@ -1318,7 +1318,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
             'document' => 'required|file|max:10240', // 10MB
         ]);
 
-        $path = $request->file('document')->store('documents'); // private (storage/app)
+        $path = \App\Support\Blob::put($request->file('document'), 'documents'); // private (storage/app)
 
         DB::table('employee_documents')->insert([
             'employee_id' => $id,
@@ -1338,14 +1338,14 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     Route::get('/documents/{id}/download', function ($id) {
         $doc = DB::table('employee_documents')->where('id', $id)->first();
         abort_if(! $doc, 404);
-        abort_if(! Storage::disk('local')->exists($doc->file_path), 404);
-        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+        abort_if(! \App\Support\Blob::exists($doc->file_path), 404);
+        return \App\Support\Blob::download($doc->file_path, $doc->original_name ?? $doc->name);
     })->middleware('role:Admin,HR');
 
     Route::delete('/documents/{id}', function ($id) {
         $doc = DB::table('employee_documents')->where('id', $id)->first();
         abort_if(! $doc, 404);
-        Storage::disk('local')->delete($doc->file_path);
+        \App\Support\Blob::delete($doc->file_path);
         DB::table('employee_documents')->where('id', $id)->delete();
         Audit::log('document.delete', Auth::user()->name . ' deleted a document');
         return redirect('/employees/' . $doc->employee_id)->with('success', 'Document removed.');
@@ -1439,7 +1439,7 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         ];
 
         if ($request->hasFile('photo')) {
-            $update['photo'] = $request->file('photo')->store('photos', 'public');
+            $update['photo'] = \App\Support\Blob::put($request->file('photo'), 'photos', 'public');
         }
 
         DB::table('employees')->where('id', $id)->update($update);
@@ -2260,8 +2260,8 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
 
     Route::get('/applicant-documents/{id}/download', function ($id) {
         $doc = DB::table('applicant_documents')->where('id', $id)->first();
-        abort_if(! $doc || ! Storage::disk('local')->exists($doc->file_path), 404);
-        return Storage::disk('local')->download($doc->file_path, $doc->original_name ?? $doc->name);
+        abort_if(! $doc || ! \App\Support\Blob::exists($doc->file_path), 404);
+        return \App\Support\Blob::download($doc->file_path, $doc->original_name ?? $doc->name);
     })->middleware('role:Admin,HR');
 
     // Convert a hired applicant into a permanent employee (carries the login over).

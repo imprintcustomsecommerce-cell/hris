@@ -20,7 +20,7 @@
 
                 <div style="display:flex; align-items:center; gap:18px; margin-bottom:24px;">
                     @if($me->photo)
-                        <img src="{{ asset('storage/' . $me->photo) }}" alt="" style="width:72px; height:72px; border-radius:20px; object-fit:cover;">
+                        <img src="{{ \App\Support\Blob::url($me->photo) }}" alt="" style="width:72px; height:72px; border-radius:20px; object-fit:cover;">
                     @else
                         <div class="avatar" style="width:72px; height:72px; border-radius:20px; font-size:28px;">{{ strtoupper(substr($me->name ?? 'E', 0, 1)) }}</div>
                     @endif

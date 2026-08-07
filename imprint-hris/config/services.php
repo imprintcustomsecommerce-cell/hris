@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    // Vercel Blob — set on Vercel, absent locally so uploads use the local disk.
+    'blob' => [
+        'token' => env('BLOB_READ_WRITE_TOKEN'),
+    ],
+
 ];

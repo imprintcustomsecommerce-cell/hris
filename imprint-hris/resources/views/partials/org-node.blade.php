@@ -2,7 +2,7 @@
 <li>
     <a href="/employees/{{ $node->id }}" class="org-card">
         @if($node->photo)
-            <img src="{{ asset('storage/' . $node->photo) }}" alt="" class="org-photo">
+            <img src="{{ \App\Support\Blob::url($node->photo) }}" alt="" class="org-photo">
         @else
             <span class="org-photo org-initial">{{ strtoupper(substr($node->name ?? 'E', 0, 1)) }}</span>
         @endif

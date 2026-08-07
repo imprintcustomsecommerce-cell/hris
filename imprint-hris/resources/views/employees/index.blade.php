@@ -49,7 +49,7 @@
                             <td>
                                 <div class="cell-user">
                                     @if($employee->photo)
-                                        <img class="avatar" src="{{ asset('storage/' . $employee->photo) }}" alt="" style="object-fit:cover;">
+                                        <img class="avatar" src="{{ \App\Support\Blob::url($employee->photo) }}" alt="" style="object-fit:cover;">
                                     @else
                                         <div class="avatar">{{ strtoupper(substr($employee->name ?? 'E', 0, 1)) }}</div>
                                     @endif
