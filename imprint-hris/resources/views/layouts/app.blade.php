@@ -428,6 +428,19 @@
         .head-actions .btn { flex: 1; }
         .profile-hero { flex-direction: column; text-align: center; }
     }
+
+    /* Demo role switcher (DEMO_MODE only) */
+    .role-switch { display: flex; align-items: center; gap: 8px; margin-left: 18px; }
+    .role-switch-label { font-size: 12px; font-weight: 700; color: var(--muted);
+                         text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+    .role-switch select {
+        border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+        border-radius: 11px; padding: 8px 12px; font-size: 13px; font-weight: 700;
+        font-family: inherit; outline: none; cursor: pointer;
+    }
+    .role-switch select:hover { border-color: var(--border-strong); }
+    .role-switch select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+    @media (max-width: 900px) { .role-switch-label { display: none; } }
 </style>
 </head>
 <body>
@@ -554,6 +567,16 @@
             </label>
             <div class="topbar-title">@yield('heading', 'Dashboard')</div>
             <div class="topbar-date">{{ now()->format('l, F d, Y') }}</div>
+            @if(\App\Support\Demo::enabled())
+                <div class="role-switch">
+                    <span class="role-switch-label">Viewing as</span>
+                    <select onchange="if(this.value) location.href = this.value;" aria-label="Switch demo role">
+                        @foreach(\App\Support\Demo::roles() as $account)
+                            <option value="/demo/{{ $account['role'] }}" @selected($role === $account['role'])>{{ $account['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
             <button type="button" class="bell" id="theme-toggle" aria-label="Toggle theme" onclick="toggleTheme()">
                 <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
                 <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>

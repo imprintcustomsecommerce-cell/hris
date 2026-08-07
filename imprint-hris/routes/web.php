@@ -142,6 +142,29 @@ Route::post('/logout', function (Request $request) {
 /*
 | Landing page: show the login form to guests, dashboard to signed-in users.
 */
+/*
+|--------------------------------------------------------------------------
+| Demo access - sign in as any role with one click (DEMO_MODE only)
+|--------------------------------------------------------------------------
+|
+| Deliberately outside the 'guest' middleware so a viewer who is already
+| signed in can hop straight to another role without logging out first.
+*/
+Route::get('/demo/{role}', function (string $role) {
+    abort_unless(App\Support\Demo::enabled(), 404);
+
+    $account = collect(App\Support\Demo::roles())->firstWhere('role', $role);
+    abort_unless($account, 404);
+
+    $user = App\Models\User::where('email', $account['email'])->first();
+    abort_if(! $user, 404, 'Demo account not seeded. Run: php artisan db:seed');
+
+    Auth::login($user);
+    request()->session()->regenerate();
+
+    return redirect(App\Support\Demo::homeFor($role));
+})->name('demo.login');
+
 Route::get('/', function () {
     if (! Auth::check()) {
         return view('auth.login');

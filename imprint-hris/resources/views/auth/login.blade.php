@@ -55,10 +55,26 @@
                 <button type="submit" class="submit">Sign In</button>
             </form>
 
-            <div class="hint">
-                <strong>Demo accounts</strong> · password <code>password</code><br>
-                admin@imprintcustoms.ph · hr@imprintcustoms.ph · employee@imprintcustoms.ph
-            </div>
+            @if(\App\Support\Demo::enabled())
+                <div class="demo-block">
+                    <div class="demo-head"><span>Explore the demo</span></div>
+                    <p class="demo-lead">Pick a role to sign in instantly. No password needed.</p>
+                    @foreach(\App\Support\Demo::roles() as $account)
+                        <a class="demo-role" href="/demo/{{ $account['role'] }}">
+                            <span class="demo-role-main">
+                                <strong>{{ $account['label'] }}</strong>
+                                <span>{{ $account['blurb'] }}</span>
+                            </span>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                        </a>
+                    @endforeach
+                </div>
+            @else
+                <div class="hint">
+                    <strong>Demo accounts</strong> · password <code>password</code><br>
+                    admin@imprintcustoms.ph · hr@imprintcustoms.ph · employee@imprintcustoms.ph
+                </div>
+            @endif
         </div>
     </div>
 </div>
@@ -122,6 +138,20 @@
         .auth { grid-template-columns: 1fr; }
         .auth-aside { display: none; }
     }
+
+    .demo-block { margin-top: 26px; padding-top: 22px; border-top: 1px solid #e4e4e7; }
+    .demo-head { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700;
+                 text-transform: uppercase; letter-spacing: .07em; color: #6b7280; }
+    .demo-lead { margin: 6px 0 14px; font-size: 13px; color: #6b7280; }
+    .demo-role { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                 padding: 12px 14px; margin-bottom: 8px; border: 1px solid #e4e4e7; border-radius: 12px;
+                 text-decoration: none; color: #0a0a0a; background: #fff; transition: .15s ease; }
+    .demo-role:hover { border-color: #facc15; box-shadow: 0 6px 18px rgba(250,204,21,.22); transform: translateY(-1px); }
+    .demo-role-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .demo-role-main strong { font-size: 14px; font-weight: 700; }
+    .demo-role-main span { font-size: 12px; color: #6b7280; }
+    .demo-role svg { width: 16px; height: 16px; flex-shrink: 0; color: #9ca3af; }
+    .demo-role:hover svg { color: #0a0a0a; }
 </style>
 
 </body>

@@ -43,6 +43,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, anyone may sign in as one of the seeded accounts with a
+    | single click and switch roles from the topbar. This removes the login
+    | barrier entirely, so it must never be on for an installation that
+    | holds real employee data.
+    |
+    */
+
+    'demo' => (bool) env('DEMO_MODE', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application URL
     |--------------------------------------------------------------------------
     |
