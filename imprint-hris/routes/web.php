@@ -1063,16 +1063,37 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
     Route::get('/dashboard', function () {
         $today = now()->toDateString();
 
+        // Nine figures over four tables. Each query is a round trip to a remote
+        // database, so they are folded into one conditional aggregate per table.
+        $emp = DB::table('employees')->selectRaw(
+            "COUNT(*) as total,
+             SUM(status = 'Active') as active,
+             SUM(status = 'On Leave') as on_leave"
+        )->first();
+
+        $att = DB::table('attendances')->whereDate('attendance_date', $today)->selectRaw(
+            "SUM(status = 'Present') as present,
+             SUM(status = 'Late') as late"
+        )->first();
+
+        $pay = DB::table('payrolls')->selectRaw(
+            "SUM(status = 'Pending') as pending,
+             SUM(CASE WHEN status = 'Paid' THEN net_pay ELSE 0 END) as total_net"
+        )->first();
+
+        $leaveByStatus = DB::table('leaves')
+            ->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->get();
+
         $stats = [
-            'totalEmployees'   => DB::table('employees')->count(),
-            'activeEmployees'  => DB::table('employees')->where('status', 'Active')->count(),
-            'onLeaveEmployees' => DB::table('employees')->where('status', 'On Leave')->count(),
+            'totalEmployees'   => (int) $emp->total,
+            'activeEmployees'  => (int) $emp->active,
+            'onLeaveEmployees' => (int) $emp->on_leave,
             'departments'      => DB::table('departments')->count(),
-            'presentToday'     => DB::table('attendances')->whereDate('attendance_date', $today)->where('status', 'Present')->count(),
-            'lateToday'        => DB::table('attendances')->whereDate('attendance_date', $today)->where('status', 'Late')->count(),
-            'pendingLeaves'    => DB::table('leaves')->where('status', 'Pending')->count(),
-            'pendingPayrolls'  => DB::table('payrolls')->where('status', 'Pending')->count(),
-            'totalNetPay'      => DB::table('payrolls')->where('status', 'Paid')->sum('net_pay'),
+            'presentToday'     => (int) $att->present,
+            'lateToday'        => (int) $att->late,
+            'pendingLeaves'    => (int) ($leaveByStatus->firstWhere('status', 'Pending')->total ?? 0),
+            'pendingPayrolls'  => (int) $pay->pending,
+            'totalNetPay'      => (float) $pay->total_net,
         ];
 
         $recentEmployees = DB::table('employees')->orderBy('id', 'desc')->limit(5)->get();
@@ -1088,9 +1109,6 @@ Route::middleware(['auth', 'role:Admin,HR'])->group(function () {
         $headcountByDept = DB::table('employees')
             ->select('department', DB::raw('COUNT(*) as total'))
             ->groupBy('department')->orderBy('total', 'desc')->get();
-
-        $leaveByStatus = DB::table('leaves')
-            ->select('status', DB::raw('COUNT(*) as total'))->groupBy('status')->get();
 
         return view('welcome', [
             'stats' => $stats,

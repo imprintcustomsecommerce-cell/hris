@@ -24,7 +24,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         mbstring \
         zip \
         gd \
+        opcache \
     && rm -rf /var/lib/apt/lists/*
+
+# php:*-cli ships with opcache disabled, so every request recompiles all of
+# Laravel from source. The code never changes inside a built image, so we can
+# also skip timestamp checks entirely.
+RUN { \
+        echo 'opcache.enable=1'; \
+        echo 'opcache.enable_cli=0'; \
+        echo 'opcache.memory_consumption=192'; \
+        echo 'opcache.interned_strings_buffer=16'; \
+        echo 'opcache.max_accelerated_files=20000'; \
+        echo 'opcache.validate_timestamps=0'; \
+    } > /usr/local/etc/php/conf.d/opcache.ini
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -77,9 +90,17 @@ RUN mkdir -p \
 # PDO's SSL option needs a file path, so write it out before starting.
 # ==========================================
 
+#
+# Caches are built at startup rather than at image build time, because the env
+# vars they bake in (database, APP_URL) only exist at runtime. Without these
+# Laravel re-parses every config and route file on each request.
+#
 CMD ["sh", "-c", "\
     if [ -n \"$AIVEN_CA_CERT\" ]; then \
         printf '%s' \"$AIVEN_CA_CERT\" > /app/storage/aiven-ca.pem; \
         export MYSQL_ATTR_SSL_CA=/app/storage/aiven-ca.pem; \
     fi; \
+    php artisan config:cache && \
+    php artisan route:cache && \
+    php artisan view:cache; \
     php artisan serve --host=0.0.0.0 --port=${PORT:-80}"]
