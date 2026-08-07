@@ -87,8 +87,6 @@
     }
 
     $currentPath = '/' . trim(request()->path(), '/');
-    $unreadCount = \Illuminate\Support\Facades\DB::table('notifications')
-        ->where('user_id', auth()->id())->whereNull('read_at')->count();
 @endphp
 
 <input type="checkbox" id="nav-toggle" class="nav-toggle-cb" hidden>
@@ -148,10 +146,6 @@
                 <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
                 <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
-            <a href="/notifications" class="bell" aria-label="Notifications">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                @if($unreadCount > 0)<span class="bell-dot">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>@endif
-            </a>
         </header>
 
         <main class="content">
@@ -366,11 +360,6 @@
     }
     .bell:hover { border-color: var(--border-strong); }
     .bell svg { width: 20px; height: 20px; }
-    .bell-dot {
-        position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px;
-        background: var(--btn); color: var(--btn-text); border-radius: 999px; font-size: 11px; font-weight: 800;
-        display: flex; align-items: center; justify-content: center; border: 2px solid var(--card);
-    }
 
     .content { padding: 32px 40px 60px; max-width: 1320px; width: 100%; }
 
