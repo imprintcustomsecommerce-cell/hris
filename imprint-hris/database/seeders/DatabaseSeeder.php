@@ -159,5 +159,8 @@ class DatabaseSeeder extends Seeder
                 'updated_at' => now(),
             ]);
         }
+
+        // Rich demonstration dataset (idempotent).
+        $this->call(DemoDataSeeder::class);
     }
 }
