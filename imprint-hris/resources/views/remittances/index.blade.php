@@ -10,12 +10,12 @@
             <p>SSS, PhilHealth, Pag-IBIG and withholding tax per payroll period.</p>
         </div>
         <form method="GET" action="/remittances" class="head-actions">
-            <select name="month" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-weight:600;font-family:inherit;">
+            <select name="month" onchange="this.form.submit()" class="select">
                 @foreach(['January','February','March','April','May','June','July','August','September','October','November','December'] as $m)
                     <option value="{{ $m }}" {{ $month === $m ? 'selected' : '' }}>{{ $m }}</option>
                 @endforeach
             </select>
-            <select name="year" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-weight:600;font-family:inherit;">
+            <select name="year" onchange="this.form.submit()" class="select">
                 @foreach($years as $y)
                     <option value="{{ $y }}" {{ (int) $year === (int) $y ? 'selected' : '' }}>{{ $y }}</option>
                 @endforeach

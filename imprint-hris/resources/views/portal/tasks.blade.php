@@ -34,7 +34,7 @@
                             <td>
                                 <form action="/portal/tasks/{{ $task->id }}/status" method="POST" class="actions">
                                     @csrf @method('PATCH')
-                                    <select name="status" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:10px;padding:8px 10px;font-size:13px;font-weight:600;font-family:inherit;">
+                                    <select name="status" onchange="this.form.submit()" class="select sm">
                                         @foreach(['Pending','In Progress','Completed'] as $st)
                                             <option value="{{ $st }}" {{ $task->status === $st ? 'selected' : '' }}>{{ $st }}</option>
                                         @endforeach

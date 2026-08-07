@@ -34,7 +34,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
                     <input type="text" name="q" value="{{ $q ?? '' }}" placeholder="Search..." style="width:180px;">
                 </div>
-                <select name="status" onchange="this.form.submit()" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-size:14px;font-weight:600;font-family:inherit;">
+                <select name="status" onchange="this.form.submit()" class="select">
                     <option value="">All statuses</option>
                     @foreach(['Pending','Paid'] as $s)
                         <option value="{{ $s }}" {{ ($status ?? '') === $s ? 'selected' : '' }}>{{ $s }}</option>

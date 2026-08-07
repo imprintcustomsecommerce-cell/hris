@@ -49,7 +49,7 @@
                     <div class="field"><label>Position Applied</label><input type="text" name="position_applied" value="{{ old('position_applied') }}" required></div>
                     <div class="field"><label>Email</label><input type="email" name="email" value="{{ old('email') }}"></div>
                     <div class="field"><label>Phone</label><input type="text" name="phone" value="{{ old('phone') }}"></div>
-                    <label class="acct-toggle" style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:#334155; cursor:pointer;">
+                    <label class="acct-toggle" style="display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--text-soft); cursor:pointer;">
                         <input type="checkbox" name="create_account" value="1" id="acct" style="width:18px;height:18px;" {{ old('create_account') ? 'checked' : '' }}> Create a temporary portal login
                     </label>
                     <div class="field" id="acctpw" style="display:none;">

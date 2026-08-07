@@ -40,7 +40,7 @@
     <div class="card" style="margin-top:18px;">
         <div class="card-head"><h2>Reason</h2></div>
         <div class="card-body" style="padding-bottom:24px;">
-            <p style="margin:8px 0 0; color:#334155; line-height:1.7;">{{ $leave->reason ?? 'No reason provided.' }}</p>
+            <p style="margin:8px 0 0; color:var(--text-soft); line-height:1.7;">{{ $leave->reason ?? 'No reason provided.' }}</p>
 
             @if(in_array(auth()->user()->role, ['Admin', 'HR']) && $leave->status === 'Pending')
                 <div class="actions" style="margin-top:22px;">

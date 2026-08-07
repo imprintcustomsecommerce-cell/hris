@@ -23,9 +23,9 @@
     <div class="card">
         <div class="card-head"><h2>Notes</h2></div>
         <div class="card-body" style="padding-bottom:20px;">
-            <div style="margin-bottom:14px;"><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Strengths</div><div style="color:#334155; font-size:14px; line-height:1.6;">{{ $review->strengths ?: '—' }}</div></div>
-            <div style="margin-bottom:14px;"><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Areas to Improve</div><div style="color:#334155; font-size:14px; line-height:1.6;">{{ $review->improvements ?: '—' }}</div></div>
-            <div><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Comments</div><div style="color:#334155; font-size:14px; line-height:1.6;">{{ $review->comments ?: '—' }}</div></div>
+            <div style="margin-bottom:14px;"><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Strengths</div><div style="color:var(--text-soft); font-size:14px; line-height:1.6;">{{ $review->strengths ?: '—' }}</div></div>
+            <div style="margin-bottom:14px;"><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Areas to Improve</div><div style="color:var(--text-soft); font-size:14px; line-height:1.6;">{{ $review->improvements ?: '—' }}</div></div>
+            <div><div style="font-weight:700; font-size:13px; margin-bottom:4px;">Comments</div><div style="color:var(--text-soft); font-size:14px; line-height:1.6;">{{ $review->comments ?: '—' }}</div></div>
         </div>
     </div>
 </div>

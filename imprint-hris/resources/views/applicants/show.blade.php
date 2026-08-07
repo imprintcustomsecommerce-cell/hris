@@ -26,7 +26,7 @@
             <div class="card-body" style="padding-top:0;">
                 <form action="/applicants/{{ $applicant->id }}/status" method="POST" style="display:flex; gap:8px; align-items:center;">
                     @csrf @method('PATCH')
-                    <select name="status" style="border:1px solid var(--border);background:#f8fafc;border-radius:11px;padding:10px 12px;font-weight:600;font-family:inherit;">
+                    <select name="status" class="select">
                         @foreach(['Applied','For Interview','For Requirements','Hired','Rejected'] as $s)
                             <option value="{{ $s }}" {{ $applicant->status === $s ? 'selected' : '' }}>{{ $s }}</option>
                         @endforeach

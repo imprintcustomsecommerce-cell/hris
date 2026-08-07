@@ -113,7 +113,7 @@
             </script>
 
             <style>
-                .acct-toggle { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:#334155; cursor:pointer; }
+                .acct-toggle { display:flex; align-items:center; gap:10px; font-size:14px; font-weight:600; color:var(--text-soft); cursor:pointer; }
                 .acct-toggle input { width:18px; height:18px; }
             </style>
         </div>

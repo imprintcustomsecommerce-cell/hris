@@ -32,7 +32,7 @@
     </div>
 
     @if($project->description)
-        <div class="card" style="margin-bottom:18px;"><div class="card-body" style="padding:20px 24px;"><p style="margin:0; color:#334155; line-height:1.7;">{{ $project->description }}</p></div></div>
+        <div class="card" style="margin-bottom:18px;"><div class="card-body" style="padding:20px 24px;"><p style="margin:0; color:var(--text-soft); line-height:1.7;">{{ $project->description }}</p></div></div>
     @endif
 
     <div class="card" style="margin-bottom:18px;">
