@@ -8,22 +8,19 @@ FROM php:8.3-cli
 
 WORKDIR /app
 
-# pdo_mysql and pdo_pgsql are both installed so the same image works
-# whichever engine the Aiven service uses. gd is for dompdf (payslip PDFs).
+# The Aiven service is MySQL. gd is for dompdf (payslip PDFs).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     curl \
     libzip-dev \
     libonig-dev \
-    libpq-dev \
     libpng-dev \
     libjpeg-dev \
     libfreetype6-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
         pdo_mysql \
-        pdo_pgsql \
         mbstring \
         zip \
         gd \
