@@ -20,9 +20,4 @@ $app = Application::configure(basePath: dirname(__DIR__))
         //
     })->create();
 
-// On Vercel the project directory is read-only; only /tmp is writable.
-if (env('VERCEL')) {
-    $app->useStoragePath('/tmp/storage');
-}
-
 return $app;

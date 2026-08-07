@@ -1,16 +1,16 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "buildCommand": "echo 'No frontend build: styles are inline in the Blade layout.'",
-  "outputDirectory": "public",
-  "functions": {
-    "api/index.php": {
-      "runtime": "vercel-php@0.7.4"
+  "services": {
+    "laravel": {
+      "root": "./",
+      "entrypoint": "Dockerfile.vercel"
     }
   },
-  "routes": [
-    { "src": "/(favicon\\.ico|robots\\.txt|logoic\\.png)", "dest": "/public/$1" },
-    { "src": "/build/(.*)", "dest": "/public/build/$1" },
-    { "src": "/(.*)", "dest": "/api/index.php" }
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "service": "laravel"
+      }
+    }
   ]
 }
